@@ -1,9 +1,10 @@
 'use strict';
-const CHAVE = 'portoSeguro.diario.v2', CHAVE_ANTIGA = 'portoSeguro.diario.v1', CHAVE_CONTATO = 'portoSeguro.contato.v1', VERSAO = 2;
+const CHAVE = 'portoSeguro.diario.v2', CHAVE_ANTIGA = 'portoSeguro.diario.v1', CHAVE_CONTATO = 'portoSeguro.contato.v1', CHAVE_PIN = 'portoSeguro.pin.v1', VERSAO = 2;
 const $ = (s, raiz = document) => raiz.querySelector(s), $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const armazenamento = window.PortoSeguroStorage;
 const estado = { registros: [], planoSeguranca: null, caixaAcolhimento: null, perfil: null, feedbackApoio: [], relatorioAtual: null, backup: null, armazenamentoPronto: false, audioPendente: null, audioUrl: null, gravador: null, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
 const CAMPOS_PLANO = ['sinais', 'gatilhos', 'ajuda', 'piora', 'lugares', 'contatos', 'profissionais', 'passos'];
+let timerBloqueio;
 
 function idSeguro() { return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function dataValida(valor) { return typeof valor === 'string' && !Number.isNaN(Date.parse(valor)); }
@@ -17,11 +18,20 @@ function normalizarRegistro(item) {
   return { id: item.id, title: String(item.title || gerarTitulo(item.text, item.createdAt)), feeling: String(item.feeling || 'Ainda não sei dizer'), intensity: Number.isInteger(item.intensity) && item.intensity >= 0 && item.intensity <= 10 ? item.intensity : null, text: item.text, helped: String(item.helped || ''), worsened: String(item.worsened || ''), strategies: Array.isArray(item.strategies) ? item.strategies.filter(x => typeof x === 'string') : [], createdAt: item.createdAt, updatedAt: dataValida(item.updatedAt) ? item.updatedAt : null, history: Array.isArray(item.history) ? item.history : [], postCrisis: normalizarPosCrise(item.postCrisis) };
 }
 function status(texto, erro = false) { const el = $('#status-app'); if (!el) return; el.textContent = texto; el.classList.toggle('erro', erro); }
-function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup','salvar-plano','apagar-plano','salvar-pos-crise','salvar-caixa','apagar-caixa','gravar-audio','salvar-perfil','redefinir-perfil','salvar-relatorio'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
+function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup','salvar-plano','apagar-plano','salvar-pos-crise','salvar-caixa','apagar-caixa','gravar-audio','salvar-perfil','redefinir-perfil','salvar-relatorio','apagar-copia-antiga'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
 function informarFalha(erro) { console.error('Operação de armazenamento não concluída:', erro?.name || 'Erro', erro?.message || 'sem detalhes'); status('Não foi possível concluir agora. Seus dados anteriores não foram apagados. Recomendamos manter seu backup em local seguro.', true); }
 function formatarData(valor) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(valor)); }
 function gerarTitulo(texto, data = new Date().toISOString()) { const inicio = String(texto).trim().replace(/\s+/g, ' ').split(' ').slice(0, 7).join(' '); return inicio ? `${inicio}${String(texto).trim().split(/\s+/).length > 7 ? '…' : ''}` : `Registro de ${new Intl.DateTimeFormat('pt-BR').format(new Date(data))}`; }
 function sentimentoSelecionado() { return $('input[name="sentimento"]:checked')?.value || 'Ainda não sei dizer'; }
+function configuracaoPin(){try{return JSON.parse(localStorage.getItem(CHAVE_PIN)||'null')}catch{return null}}
+function bytesBase64(bytes){return btoa(String.fromCharCode(...bytes))}
+async function derivarPin(pin,salBase64){const sal=Uint8Array.from(atob(salBase64),c=>c.charCodeAt(0)),chave=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:sal,iterations:150000,hash:'SHA-256'},chave,256);return bytesBase64(new Uint8Array(bits))}
+function bloquearAgora(){if(!configuracaoPin())return $('#status-pin').textContent='Configure um PIN primeiro.';clearTimeout(timerBloqueio);document.documentElement.classList.remove('pre-bloqueado');document.body.classList.add('bloqueado','sem-rolagem');$('#tela-bloqueio').hidden=false;$('#pin-desbloqueio').value='';$('#status-desbloqueio').textContent='';$('#pin-desbloqueio').focus()}
+function reiniciarInatividade(){const c=configuracaoPin();clearTimeout(timerBloqueio);if(c&&!document.body.classList.contains('bloqueado'))timerBloqueio=setTimeout(bloquearAgora,Number(c.minutes||5)*60000)}
+async function configurarPin(evento){evento.preventDefault();const pin=$('#novo-pin').value,confirmacao=$('#confirmar-pin').value;if(!/^\d{4,8}$/.test(pin)||pin!==confirmacao)return $('#status-pin').textContent='Use de 4 a 8 números iguais nos dois campos.';const sal=crypto.getRandomValues(new Uint8Array(16)),config={salt:bytesBase64(sal),hash:await derivarPin(pin,bytesBase64(sal)),minutes:Number($('#tempo-bloqueio').value),createdAt:new Date().toISOString()};localStorage.setItem(CHAVE_PIN,JSON.stringify(config));$('#novo-pin').value='';$('#confirmar-pin').value='';$('#status-pin').textContent='PIN ativado. Ele bloqueia a tela, mas não criptografa os dados.';reiniciarInatividade()}
+async function desbloquear(evento){evento.preventDefault();const c=configuracaoPin();if(!c)return;const hash=await derivarPin($('#pin-desbloqueio').value,c.salt);if(hash!==c.hash)return $('#status-desbloqueio').textContent='PIN incorreto.';$('#tela-bloqueio').hidden=true;document.body.classList.remove('bloqueado','sem-rolagem');document.documentElement.classList.remove('pre-bloqueado');reiniciarInatividade();$('#inicio').focus?.()}
+function removerPin(){if(!configuracaoPin())return $('#status-pin').textContent='Nenhum PIN está configurado.';if(!confirm('Remover a proteção por PIN deste aparelho? Os dados continuarão sem criptografia.'))return;localStorage.removeItem(CHAVE_PIN);clearTimeout(timerBloqueio);$('#status-pin').textContent='Proteção por PIN removida.'}
+async function apagarCopiaAntiga(){const migracao=await armazenamento.buscarMetadado('migracaoLocalStorageV1');if(!migracao?.completedAt)return $('#status-pin').textContent='A migração ainda não foi validada; a cópia antiga foi preservada.';if(!confirm('Confirma que possui backup recente e deseja apagar as cópias antigas do diário no localStorage?'))return;localStorage.removeItem(CHAVE);localStorage.removeItem(CHAVE_ANTIGA);$('#status-pin').textContent='Cópias antigas removidas. O diário atual no IndexedDB foi preservado.'}
 
 function normalizarPlano(item) {
   if (!item || typeof item !== 'object') return null;
@@ -116,6 +126,7 @@ async function salvarRegistro(evento) {
 }
 function editar(id) {
   const r = estado.registros.find(x => x.id === id); if (!r) return;
+  $('#mensagem-sugestao').replaceChildren();
   $('#registro-id').value = r.id; $('#titulo-registro').value = r.title; $('#texto-registro').value = r.text; $('#ajudou-registro').value = r.helped; $('#piorou-registro').value = r.worsened;
   const radio = $(`input[name="sentimento"][value="${CSS.escape(r.feeling)}"]`) || $('input[name="sentimento"]'); radio.checked = true;
   $('#intensidade-incerta').checked = r.intensity === null; $('#intensidade-registro').disabled = r.intensity === null; $('#intensidade-registro').value = r.intensity ?? 5; $('#valor-intensidade').textContent = r.intensity ?? '—'; $('#status-edicao').hidden = false; $('#cancelar-edicao').hidden = false; $('#salvar-registro').textContent = 'Salvar alterações'; $('#form-diario').scrollIntoView({ behavior: movimento(), block: 'start' }); $('#titulo-registro').focus({ preventScroll: true });
@@ -143,11 +154,9 @@ function renderizar() {
 }
 async function carregarAudioRegistro(id, card){try{const item=await armazenamento.buscarAudioDiario(id);if(!item?.blob||!card.isConnected)return;const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=URL.createObjectURL(item.blob);const titulo=document.createElement('p');titulo.className='ajuda';titulo.textContent='Áudio local deste registro:';$('.registro-audio',card).append(titulo,audio)}catch(e){console.info('Áudio local indisponível.',e?.name||'Erro')}}
 function sugerir() {
-  const texto = $('#texto-registro').value.toLocaleLowerCase('pt-BR'), mapa = [['Ansiedade',['ansied','aperto','preocup','nervos']],['Tristeza',['trist','chor','vazio']],['Irritação',['raiva','irrit','revolt']],['Medo',['medo','pânico','assust']],['Cansaço',['cans','exaust','esgot']],['Confusão',['confus','não sei','perdid']],['Felicidade',['feliz','alegr','orgulho']],['Calma',['calm','tranquil','alívio']],['Frustração',['frustr','decepcion']],['Sobrecarga',['sobrecarreg','peso demais','não dou conta']]];
+  const texto = $('#texto-registro').value.toLocaleLowerCase('pt-BR'), mapa = [['Ansiedade',['ansied','ansiosa','ansioso','aperto','preocup','nervos']],['Tristeza',['trist','chor','vazio']],['Irritação',['raiva','irrit','revolt']],['Medo',['medo','pânico','assust']],['Cansaço',['cans','exaust','esgot']],['Confusão',['confus','não sei','perdid']],['Felicidade',['feliz','alegr','orgulho']],['Calma',['calm','tranquil','alívio']],['Frustração',['frustr','decepcion']],['Sobrecarga',['sobrecarreg','peso demais','não dou conta']]];
   if (!texto.trim()) { $('#mensagem-sugestao').textContent = 'Escreva um pouco primeiro.'; return; }
-  const achado = mapa.find(([, palavras]) => palavras.some(p => texto.includes(p))); if (!achado) { $('#mensagem-sugestao').textContent = 'Não encontrei uma sugestão clara. Tudo bem escolher “Ainda não sei dizer”.'; return; }
-  $(`input[name="sentimento"][value="${achado[0]}"]`).checked = true; $('#mensagem-sugestao').textContent = `Sugestão local: ${achado[0]}. Confirme ou escolha outra opção; isto não é diagnóstico.`;
-  if (/(me matar|suicid|não quero viver|vou me machucar)/i.test(texto)) $('#mensagem-sugestao').textContent += ' Talvez você precise de apoio humano agora. Você gostaria de ver as opções de ajuda?';
+  const achados=mapa.filter(([,palavras])=>palavras.some(p=>texto.includes(p))).map(([nome])=>nome),alvo=$('#mensagem-sugestao');alvo.replaceChildren();if(!achados.length){alvo.textContent='Não encontrei uma sugestão clara. Tudo bem escolher “Ainda não sei dizer”.';return}const textoAjuda=document.createTextNode(`Possibilidades locais: ${achados.join(', ')}. Escolha uma para confirmar; isto não é diagnóstico. `);alvo.append(textoAjuda);achados.forEach(nome=>{const botao=document.createElement('button');botao.type='button';botao.className='botao-link';botao.textContent=nome;botao.addEventListener('click',()=>{const radio=$(`input[name="sentimento"][value="${CSS.escape(nome)}"]`);if(radio)radio.checked=true;alvo.textContent=`Você confirmou ${nome}. Pode alterar quando quiser.`});alvo.append(botao)});if (/(me matar|suicid|não quero viver|vou me machucar)/i.test(texto)) alvo.append(document.createTextNode(' Talvez você precise de apoio humano agora. Você gostaria de ver as opções de ajuda?'));
 }
 
 async function baixarBackup() {
@@ -215,7 +224,7 @@ function mostrarApoio(tipo) {
   const textos={regular:escolherFrase(),confianca:'Você pode escolher alguém que escute sem julgar. Se quiser, configure um contato na tela de ajuda urgente; o aplicativo só facilitará a ligação quando você tocar.',perguntas:'O que ajudaria mais agora? Você pode escrever, apenas escolher uma opção ou ficar em silêncio por alguns instantes.'}; box.textContent=textos[tipo]||textos.perguntas;
 }
 function contato() { try { return JSON.parse(localStorage.getItem(CHAVE_CONTATO)||'null'); } catch { return null; } }
-function atualizarContato() { const c=contato(); $('#nome-contato').textContent=c?.name?`Conversar com ${c.name}`:'Configure um contato abaixo'; $('#contato-nome').value=c?.name||''; $('#contato-telefone').value=c?.phone||''; $('#contato-mensagem').value=c?.message||'Não estou bem agora. Não precisa resolver nada, apenas fique comigo e, se puder, entre em contato.'; }
+function atualizarContato() { const c=contato(); $('#nome-contato').textContent=c?.name?`Conversar com ${c.name}${c.phone?` · final ${c.phone.slice(-4)}`:''}`:'Configure um contato abaixo'; $('#contato-nome').value=c?.name||''; $('#contato-telefone').type='password'; $('#contato-telefone').value=c?.phone||''; $('#contato-mensagem').value=c?.message||'Não estou bem agora. Não precisa resolver nada, apenas fique comigo e, se puder, entre em contato.'; }
 function abrirMensagemRapida() {
   const c=contato(), campo=$('#mensagem-rapida-texto');
   $$('.mensagem-pronta').forEach(botao=>botao.classList.remove('selecionada'));
@@ -257,8 +266,11 @@ $('#form-pos-crise').addEventListener('submit',salvarPosCrise); $('#limpar-pos-c
 ['antes','depois'].forEach(sufixo=>{const faixa=$(`#pos-intensidade-${sufixo}`), incerta=$(`#pos-incerta-${sufixo}`), valor=$(`#pos-valor-${sufixo}`); faixa.addEventListener('input',()=>{valor.textContent=faixa.value}); incerta.addEventListener('change',()=>{faixa.disabled=incerta.checked;valor.textContent=incerta.checked?'—':faixa.value});});
 $('#form-caixa').addEventListener('submit',salvarCaixa);$('#apagar-caixa').addEventListener('click',apagarCaixa);$('#gravar-audio').addEventListener('click',gravarAudio);$('#parar-audio').addEventListener('click',()=>estado.gravador?.stop());$('#descartar-audio').addEventListener('click',descartarAudio);
 $('#form-perfil').addEventListener('submit',salvarPerfil);$('#form-perfil').addEventListener('input',agendarPerfil);$('#form-perfil').addEventListener('change',agendarPerfil);$('#redefinir-perfil').addEventListener('click',redefinirPerfil);$('#nova-frase').addEventListener('click',mostrarFrase);$$('.avaliar-frase').forEach(b=>b.addEventListener('click',()=>avaliarFrase(b.dataset.avaliacao)));
+$('#form-pin').addEventListener('submit',configurarPin);$('#form-desbloqueio').addEventListener('submit',desbloquear);$('#bloquear-agora').addEventListener('click',bloquearAgora);$('#remover-pin').addEventListener('click',removerPin);$('#apagar-copia-antiga').addEventListener('click',apagarCopiaAntiga);['pointerdown','keydown','touchstart'].forEach(nome=>document.addEventListener(nome,reiniciarInatividade,{passive:true}));
 
 async function inicializarAplicacao() {
+  const hashInicial=location.hash;
+  if(configuracaoPin())bloquearAgora();else document.documentElement.classList.remove('pre-bloqueado');
   alternarControlesArmazenamento(false);
   status('Preparando o armazenamento local…');
   const resultado = await armazenamento.inicializar({ chaveAtual: CHAVE, chaveAntiga: CHAVE_ANTIGA, versaoBackup: VERSAO, normalizarRegistro });
@@ -269,6 +281,7 @@ async function inicializarAplicacao() {
   estado.armazenamentoPronto = true;
   alternarControlesArmazenamento(true);
   renderizar();
+  if(hashInicial){const alvo=document.getElementById(decodeURIComponent(hashInicial.slice(1)));requestAnimationFrame(()=>requestAnimationFrame(()=>alvo?.scrollIntoView({block:'start'})))}
   if (resultado.modo === 'indexeddb') {
     status(resultado.migracao.executada && resultado.migracao.quantidade > 0 ? `${resultado.migracao.quantidade} registro(s) preservado(s) no novo armazenamento local.` : 'Armazenamento local pronto.');
   } else {

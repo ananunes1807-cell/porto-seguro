@@ -1,4 +1,4 @@
-const CACHE_NAME = 'porto-seguro-v9';
+const CACHE_NAME = 'porto-seguro-v10';
 const ARQUIVOS = [
     './',
     './index.html',
