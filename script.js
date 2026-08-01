@@ -2,7 +2,7 @@
 const CHAVE = 'portoSeguro.diario.v2', CHAVE_ANTIGA = 'portoSeguro.diario.v1', CHAVE_CONTATO = 'portoSeguro.contato.v1', VERSAO = 2;
 const $ = (s, raiz = document) => raiz.querySelector(s), $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const armazenamento = window.PortoSeguroStorage;
-const estado = { registros: [], planoSeguranca: null, backup: null, armazenamentoPronto: false, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
+const estado = { registros: [], planoSeguranca: null, caixaAcolhimento: null, backup: null, armazenamentoPronto: false, audioPendente: null, audioUrl: null, gravador: null, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
 const CAMPOS_PLANO = ['sinais', 'gatilhos', 'ajuda', 'piora', 'lugares', 'contatos', 'profissionais', 'passos'];
 
 function idSeguro() { return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -17,7 +17,7 @@ function normalizarRegistro(item) {
   return { id: item.id, title: String(item.title || gerarTitulo(item.text, item.createdAt)), feeling: String(item.feeling || 'Ainda não sei dizer'), intensity: Number.isInteger(item.intensity) && item.intensity >= 0 && item.intensity <= 10 ? item.intensity : null, text: item.text, helped: String(item.helped || ''), worsened: String(item.worsened || ''), strategies: Array.isArray(item.strategies) ? item.strategies.filter(x => typeof x === 'string') : [], createdAt: item.createdAt, updatedAt: dataValida(item.updatedAt) ? item.updatedAt : null, history: Array.isArray(item.history) ? item.history : [], postCrisis: normalizarPosCrise(item.postCrisis) };
 }
 function status(texto, erro = false) { const el = $('#status-app'); if (!el) return; el.textContent = texto; el.classList.toggle('erro', erro); }
-function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup','salvar-plano','apagar-plano','salvar-pos-crise'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
+function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup','salvar-plano','apagar-plano','salvar-pos-crise','salvar-caixa','apagar-caixa','gravar-audio'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
 function informarFalha(erro) { console.error('Operação de armazenamento não concluída:', erro?.name || 'Erro', erro?.message || 'sem detalhes'); status('Não foi possível concluir agora. Seus dados anteriores não foram apagados. Recomendamos manter seu backup em local seguro.', true); }
 function formatarData(valor) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(valor)); }
 function gerarTitulo(texto, data = new Date().toISOString()) { const inicio = String(texto).trim().replace(/\s+/g, ' ').split(' ').slice(0, 7).join(' '); return inicio ? `${inicio}${String(texto).trim().split(/\s+/).length > 7 ? '…' : ''}` : `Registro de ${new Intl.DateTimeFormat('pt-BR').format(new Date(data))}`; }
@@ -70,6 +70,17 @@ async function salvarPosCrise(evento) {
   catch (erro) { console.error('Registro pós-crise não salvo:', erro?.name || 'Erro'); $('#status-pos-crise').textContent = 'Não foi possível salvar agora. Nenhum registro anterior foi apagado.'; }
   finally { botao.disabled = false; }
 }
+function arquivoValido(arquivo, tipo, limite) { return !arquivo || (arquivo.type.startsWith(tipo) && arquivo.size <= limite); }
+function mostrarMidiaCaixa(caixa) {
+  const foto=$('#preview-caixa-foto'), audio=$('#preview-caixa-audio'); foto.replaceChildren(); audio.replaceChildren();
+  if(caixa?.photo instanceof Blob){const img=document.createElement('img');img.alt='Foto guardada na caixa de acolhimento';img.className='foto-acolhimento';img.src=URL.createObjectURL(caixa.photo);foto.append(img)}
+  if(caixa?.audio instanceof Blob){const player=document.createElement('audio');player.controls=true;player.src=URL.createObjectURL(caixa.audio);audio.append(player)}
+}
+function preencherCaixa(caixa){['mensagem','funciona','lembranca','exercicio'].forEach(c=>{$(`#caixa-${c}`).value=caixa?.[c]||''});mostrarMidiaCaixa(caixa)}
+async function salvarCaixa(evento){evento.preventDefault();const foto=$('#caixa-foto').files[0],audio=$('#caixa-audio').files[0];if(!arquivoValido(foto,'image/',4_000_000))return $('#status-caixa').textContent='Escolha uma imagem JPG, PNG ou WebP de até 4 MB.';if(!arquivoValido(audio,'audio/',6_000_000))return $('#status-caixa').textContent='Escolha um áudio de até 6 MB.';const atual=estado.caixaAcolhimento||{};const caixa={id:'minha-caixa',mensagem:$('#caixa-mensagem').value.trim(),funciona:$('#caixa-funciona').value.trim(),lembranca:$('#caixa-lembranca').value.trim(),exercicio:$('#caixa-exercicio').value.trim(),photo:foto||atual.photo||null,audio:audio||atual.audio||null,updatedAt:new Date().toISOString()};if(!caixa.mensagem&&!caixa.funciona&&!caixa.lembranca&&!caixa.exercicio&&!caixa.photo&&!caixa.audio)return $('#status-caixa').textContent='Adicione pelo menos um item à sua caixa.';try{await armazenamento.salvarCaixaAcolhimento(caixa);estado.caixaAcolhimento=caixa;$('#caixa-foto').value='';$('#caixa-audio').value='';mostrarMidiaCaixa(caixa);$('#status-caixa').textContent='Caixa de acolhimento salva neste aparelho.'}catch(e){console.error('Caixa não salva:',e?.name||'Erro');$('#status-caixa').textContent='Não foi possível salvar a caixa agora.'}}
+async function apagarCaixa(){if(!estado.caixaAcolhimento)return $('#status-caixa').textContent='Ainda não há uma caixa salva.';if(!confirm('Apagar toda a caixa de acolhimento deste aparelho?'))return;try{await armazenamento.excluirCaixaAcolhimento();estado.caixaAcolhimento=null;preencherCaixa(null);$('#status-caixa').textContent='Caixa apagada deste aparelho.'}catch{$('#status-caixa').textContent='Não foi possível apagar a caixa agora.'}}
+function descartarAudio(){if(estado.audioUrl)URL.revokeObjectURL(estado.audioUrl);estado.audioUrl=null;estado.audioPendente=null;const p=$('#preview-audio-diario');p.hidden=true;p.removeAttribute('src');$('#descartar-audio').hidden=true;$('#status-audio').textContent='Áudio descartado.'}
+async function gravarAudio(){if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return $('#status-audio').textContent='A gravação não está disponível neste navegador.';try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});const partes=[];const gravador=new MediaRecorder(stream);estado.gravador=gravador;gravador.ondataavailable=e=>{if(e.data.size)partes.push(e.data)};gravador.onstop=()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(partes,{type:gravador.mimeType||'audio/webm'});if(blob.size>8_000_000){$('#status-audio').textContent='O áudio passou de 8 MB e foi descartado.';return}estado.audioPendente=blob;estado.audioUrl=URL.createObjectURL(blob);const p=$('#preview-audio-diario');p.src=estado.audioUrl;p.hidden=false;$('#descartar-audio').hidden=false;$('#status-audio').textContent='Gravação pronta. Ouça antes de salvar.';$('#gravar-audio').disabled=false;$('#parar-audio').disabled=true};gravador.start();$('#gravar-audio').disabled=true;$('#parar-audio').disabled=false;$('#status-audio').textContent='Gravando… toque em parar quando terminar.'}catch(e){$('#status-audio').textContent=e?.name==='NotAllowedError'?'Permissão do microfone não concedida.':'Não foi possível iniciar a gravação.'}}
 
 function limparFormulario() {
   $('#form-diario').reset(); $('#registro-id').value = ''; $('#valor-intensidade').textContent = '5'; $('#intensidade-registro').disabled = false; $('#status-edicao').hidden = true; $('#cancelar-edicao').hidden = true; $('#salvar-registro').textContent = 'Salvar no meu aparelho'; $('#mensagem-sugestao').textContent = '';
@@ -87,8 +98,10 @@ async function salvarRegistro(evento) {
   const botao = $('#salvar-registro'); botao.disabled = true;
   try {
     await armazenamento.salvar(registro);
+    let audioFalhou = false;
+    if (estado.audioPendente) { try { await armazenamento.salvarAudioDiario(registro.id, estado.audioPendente); } catch (erroAudio) { audioFalhou = true; console.error('Áudio do diário não salvo:', erroAudio?.name || 'Erro'); } }
     if (indice >= 0) estado.registros[indice] = registro; else estado.registros.unshift(registro);
-    limparFormulario(); renderizar(); status(indice >= 0 ? 'Alterações salvas. A versão anterior foi preservada.' : 'Registro salvo neste aparelho.');
+    limparFormulario(); if(estado.audioPendente) descartarAudio(); renderizar(); status(audioFalhou ? 'O texto foi salvo, mas não houve espaço para guardar o áudio.' : indice >= 0 ? 'Alterações salvas. A versão anterior foi preservada.' : 'Registro salvo neste aparelho.', audioFalhou);
   } catch (erro) { informarFalha(erro); }
   finally { botao.disabled = false; }
 }
@@ -116,9 +129,10 @@ function renderizar() {
     const detalhes = $('.detalhes-registro', frag); if (r.helped) { const p = document.createElement('p'); p.textContent = `O que ajudou: ${r.helped}`; detalhes.append(p); } if (r.worsened) { const p = document.createElement('p'); p.textContent = `O que piorou: ${r.worsened}`; detalhes.append(p); }
     if (r.postCrisis) { const p = document.createElement('p'); p.textContent = 'Tipo: registro pós-crise'; detalhes.prepend(p); $('.editar-registro', frag).remove(); }
     const ed = $('.registro-edicao', frag); if (r.updatedAt) ed.textContent = `Editado em ${formatarData(r.updatedAt)} · ${r.history.length} versão(ões) anterior(es)`; else ed.remove();
-    lista.append(frag);
+    lista.append(frag); carregarAudioRegistro(r.id, card);
   });
 }
+async function carregarAudioRegistro(id, card){try{const item=await armazenamento.buscarAudioDiario(id);if(!item?.blob||!card.isConnected)return;const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=URL.createObjectURL(item.blob);const titulo=document.createElement('p');titulo.className='ajuda';titulo.textContent='Áudio local deste registro:';$('.registro-audio',card).append(titulo,audio)}catch(e){console.info('Áudio local indisponível.',e?.name||'Erro')}}
 function sugerir() {
   const texto = $('#texto-registro').value.toLocaleLowerCase('pt-BR'), mapa = [['Ansiedade',['ansied','aperto','preocup','nervos']],['Tristeza',['trist','chor','vazio']],['Irritação',['raiva','irrit','revolt']],['Medo',['medo','pânico','assust']],['Cansaço',['cans','exaust','esgot']],['Confusão',['confus','não sei','perdid']],['Felicidade',['feliz','alegr','orgulho']],['Calma',['calm','tranquil','alívio']],['Frustração',['frustr','decepcion']],['Sobrecarga',['sobrecarreg','peso demais','não dou conta']]];
   if (!texto.trim()) { $('#mensagem-sugestao').textContent = 'Escreva um pouco primeiro.'; return; }
@@ -131,21 +145,24 @@ async function baixarBackup() {
   try {
     const registros = await armazenamento.buscarTodos();
     const planoSeguranca = await armazenamento.buscarPlanoSeguranca();
-    if (!registros.length && !planoSeguranca) return alert('Ainda não há diário ou plano pessoal para o backup.');
-    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 2, createdAt: new Date().toISOString(), entries: registros, safetyPlan: planoSeguranca }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado com o diário e o plano pessoal. Guarde o arquivo em um local escolhido por você.');
+    const caixa = await armazenamento.buscarCaixaAcolhimento(), comfortBox = caixa ? { mensagem:caixa.mensagem, funciona:caixa.funciona, lembranca:caixa.lembranca, exercicio:caixa.exercicio, updatedAt:caixa.updatedAt } : null;
+    if (!registros.length && !planoSeguranca && !caixa) return alert('Ainda não há dados para o backup.');
+    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 3, createdAt: new Date().toISOString(), entries: registros, safetyPlan: planoSeguranca, comfortBox }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado. Fotos e áudios permanecem somente neste aparelho.');
   } catch (erro) { informarFalha(erro); }
 }
 function lerBackup(evento) {
   const arquivo = evento.target.files[0]; evento.target.value = ''; if (!arquivo || arquivo.size > 10_000_000) return status('Arquivo ausente ou maior que 10 MB.', true);
-  const leitor = new FileReader(); leitor.onload = () => { try { const b = JSON.parse(leitor.result); if (b.app !== 'Porto Seguro' || !Array.isArray(b.entries)) throw Error('Formato não reconhecido.'); const validos = b.entries.map(normalizarRegistro).filter(Boolean); if (validos.length !== b.entries.length || (!validos.length && !b.safetyPlan)) throw Error('Não há dados válidos no arquivo.'); const plano = b.safetyPlan ? normalizarPlano(b.safetyPlan) : null; estado.backup = { registros: validos, plano }; $('#resumo-backup').textContent = `${validos.length} registro(s) válido(s)${plano ? ' e um plano pessoal' : ''}. Mesclar mantém os atuais; substituir apaga os registros atuais. Se houver um plano no arquivo, ele substituirá o plano atual.`; abrirModal($('#tela-restauracao')); } catch (e) { status(`Não foi possível restaurar: ${e.message}`, true); } }; leitor.onerror = () => status('Não foi possível ler o arquivo.', true); leitor.readAsText(arquivo);
+  const leitor = new FileReader(); leitor.onload = () => { try { const b = JSON.parse(leitor.result); if (b.app !== 'Porto Seguro' || !Array.isArray(b.entries)) throw Error('Formato não reconhecido.'); const validos = b.entries.map(normalizarRegistro).filter(Boolean); if (validos.length !== b.entries.length || (!validos.length && !b.safetyPlan && !b.comfortBox)) throw Error('Não há dados válidos no arquivo.'); const plano = b.safetyPlan ? normalizarPlano(b.safetyPlan) : null; const caixa=b.comfortBox&&typeof b.comfortBox==='object'?{mensagem:String(b.comfortBox.mensagem||''),funciona:String(b.comfortBox.funciona||''),lembranca:String(b.comfortBox.lembranca||''),exercicio:String(b.comfortBox.exercicio||''),updatedAt:dataValida(b.comfortBox.updatedAt)?b.comfortBox.updatedAt:new Date().toISOString()}:null; estado.backup = { registros: validos, plano, caixa }; $('#resumo-backup').textContent = `${validos.length} registro(s) válido(s)${plano ? ', um plano pessoal' : ''}${caixa?', textos da caixa de acolhimento':''}. Fotos e áudios não fazem parte do arquivo.`; abrirModal($('#tela-restauracao')); } catch (e) { status(`Não foi possível restaurar: ${e.message}`, true); } }; leitor.onerror = () => status('Não foi possível ler o arquivo.', true); leitor.readAsText(arquivo);
 }
 async function aplicarBackup(substituir) {
   if (!estado.backup) return; if (substituir && !confirm('Isso substituirá todos os registros atuais. Deseja continuar?')) return;
   try {
     await armazenamento.importar(estado.backup.registros, substituir);
     if (estado.backup.plano) await armazenamento.salvarPlanoSeguranca(estado.backup.plano);
+    if (estado.backup.caixa) { const atual=await armazenamento.buscarCaixaAcolhimento()||{}; await armazenamento.salvarCaixaAcolhimento({...atual,...estado.backup.caixa}); }
     estado.registros = await armazenamento.buscarTodos();
     estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca);
+    estado.caixaAcolhimento = await armazenamento.buscarCaixaAcolhimento(); preencherCaixa(estado.caixaAcolhimento);
     fecharModal($('#tela-restauracao')); renderizar(); status(`Backup ${substituir ? 'restaurado, substituindo' : 'mesclado com'} os registros atuais.`); estado.backup = null;
   } catch (erro) { informarFalha(erro); }
 }
@@ -229,6 +246,7 @@ document.addEventListener('keydown',e=>{const modal=$$('.modal').find(m=>!m.hidd
 $('#form-plano-seguranca').addEventListener('submit',salvarPlano); $('#imprimir-plano').addEventListener('click',imprimirPlano); $('#apagar-plano').addEventListener('click',apagarPlano);
 $('#form-pos-crise').addEventListener('submit',salvarPosCrise); $('#limpar-pos-crise').addEventListener('click',()=>{limparPosCrise();$('#status-pos-crise').textContent='Campos limpos; nada foi salvo.';});
 ['antes','depois'].forEach(sufixo=>{const faixa=$(`#pos-intensidade-${sufixo}`), incerta=$(`#pos-incerta-${sufixo}`), valor=$(`#pos-valor-${sufixo}`); faixa.addEventListener('input',()=>{valor.textContent=faixa.value}); incerta.addEventListener('change',()=>{faixa.disabled=incerta.checked;valor.textContent=incerta.checked?'—':faixa.value});});
+$('#form-caixa').addEventListener('submit',salvarCaixa);$('#apagar-caixa').addEventListener('click',apagarCaixa);$('#gravar-audio').addEventListener('click',gravarAudio);$('#parar-audio').addEventListener('click',()=>estado.gravador?.stop());$('#descartar-audio').addEventListener('click',descartarAudio);
 
 async function inicializarAplicacao() {
   alternarControlesArmazenamento(false);
@@ -236,6 +254,7 @@ async function inicializarAplicacao() {
   const resultado = await armazenamento.inicializar({ chaveAtual: CHAVE, chaveAntiga: CHAVE_ANTIGA, versaoBackup: VERSAO, normalizarRegistro });
   estado.registros = resultado.registros;
   try { estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca); } catch (erro) { console.error('Plano pessoal indisponível:', erro?.name || 'Erro'); $('#status-plano').textContent = 'O plano pessoal não está disponível neste navegador.'; }
+  try { estado.caixaAcolhimento = await armazenamento.buscarCaixaAcolhimento(); preencherCaixa(estado.caixaAcolhimento); } catch (erro) { console.error('Caixa indisponível:', erro?.name || 'Erro'); $('#status-caixa').textContent = 'A caixa de acolhimento não está disponível neste navegador.'; }
   estado.armazenamentoPronto = true;
   alternarControlesArmazenamento(true);
   renderizar();

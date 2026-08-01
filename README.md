@@ -10,6 +10,8 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - fluxo “Não consigo falar agora” com mensagens prontas, edição do texto e abertura manual do WhatsApp;
 - plano pessoal de segurança com sinais, gatilhos, estratégias, lugares seguros, profissionais e contatos, salvo localmente, imprimível e incluído no backup;
 - registro pós-crise com intensidade antes e depois, possível gatilho, estratégia, resultado e observações, integrado ao diário, aos relatórios e ao backup;
+- caixa de acolhimento com textos, foto e áudio locais, com limites de tamanho e exclusão confirmada;
+- gravação de áudio no diário após permissão explícita, com reprodução e descarte antes de salvar no IndexedDB;
 - respiração em cinco ciclos (4 segundos inspirando e 6 soltando), com pausa, continuação, foco preso no diálogo e redução de movimento;
 - diário com título automático, sentimentos, intensidade, texto livre, campos “o que ajudou” e “o que piorou”;
 - criação e edição com data/hora, identificador preservado e histórico de versões;
@@ -51,5 +53,5 @@ O Porto Seguro não diagnostica, não substitui terapia, atendimento médico ou 
 - os dados não sincronizam entre aparelhos ou origens diferentes;
 - limites e disponibilidade do `IndexedDB` variam por navegador;
 - o ícone atual é SVG; alguns dispositivos antigos podem exigir ícones PNG de 192 e 512 px;
-- áudio não foi incluído: uma versão futura deve solicitar microfone somente ao tocar em gravar e armazenar áudio localmente em IndexedDB;
+- fotos e áudios ficam apenas no navegador e não são incluídos no backup JSON;
 - IA online exigiria consentimento, política de privacidade e backend seguro; nenhuma chave de API existe neste projeto.

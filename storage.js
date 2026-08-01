@@ -3,10 +3,12 @@
 // Camada única de persistência do diário. A interface nunca acessa IndexedDB diretamente.
 window.PortoSeguroStorage = (() => {
   const NOME_BANCO = 'portoSeguroDB';
-  const VERSAO_BANCO = 2;
+  const VERSAO_BANCO = 3;
   const STORE_REGISTROS = 'registros';
   const STORE_METADADOS = 'metadados';
   const STORE_PLANOS = 'planosSeguranca';
+  const STORE_ACOLHIMENTO = 'caixaAcolhimento';
+  const STORE_AUDIOS = 'audiosDiario';
   const META_MIGRACAO = 'migracaoLocalStorageV1';
   let banco = null;
   let modo = 'indexeddb';
@@ -42,6 +44,8 @@ window.PortoSeguroStorage = (() => {
         if (!registros.indexNames.contains('porSentimento')) registros.createIndex('porSentimento', 'feeling');
         if (!db.objectStoreNames.contains(STORE_METADADOS)) db.createObjectStore(STORE_METADADOS, { keyPath: 'key' });
         if (!db.objectStoreNames.contains(STORE_PLANOS)) db.createObjectStore(STORE_PLANOS, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_ACOLHIMENTO)) db.createObjectStore(STORE_ACOLHIMENTO, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_AUDIOS)) db.createObjectStore(STORE_AUDIOS, { keyPath: 'recordId' });
       };
       abertura.onsuccess = () => {
         banco = abertura.result;
@@ -139,8 +143,9 @@ window.PortoSeguroStorage = (() => {
 
   async function excluir(id) {
     if (modo !== 'indexeddb') return salvarFallback((await buscarTodos()).filter(item => item.id !== id));
-    const tx = banco.transaction(STORE_REGISTROS, 'readwrite');
+    const tx = banco.transaction([STORE_REGISTROS, STORE_AUDIOS], 'readwrite');
     tx.objectStore(STORE_REGISTROS).delete(id);
+    tx.objectStore(STORE_AUDIOS).delete(id);
     await concluirTransacao(tx);
   }
 
@@ -177,5 +182,12 @@ window.PortoSeguroStorage = (() => {
     await concluirTransacao(tx);
   }
 
-  return { inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado, buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca, informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS], modo }) };
+  async function buscarCaixaAcolhimento() { if (modo !== 'indexeddb') return null; const tx=banco.transaction(STORE_ACOLHIMENTO,'readonly'); return requisicao(tx.objectStore(STORE_ACOLHIMENTO).get('minha-caixa')); }
+  async function salvarCaixaAcolhimento(caixa) { if(modo!=='indexeddb') throw new Error('IndexedDB indisponível.'); const tx=banco.transaction(STORE_ACOLHIMENTO,'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).put({...caixa,id:'minha-caixa'}); await concluirTransacao(tx); }
+  async function excluirCaixaAcolhimento() { if(modo!=='indexeddb') return; const tx=banco.transaction(STORE_ACOLHIMENTO,'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).delete('minha-caixa'); await concluirTransacao(tx); }
+  async function buscarAudioDiario(recordId) { if(modo!=='indexeddb') return null; const tx=banco.transaction(STORE_AUDIOS,'readonly'); return requisicao(tx.objectStore(STORE_AUDIOS).get(recordId)); }
+  async function salvarAudioDiario(recordId, blob) { if(modo!=='indexeddb') throw new Error('IndexedDB indisponível.'); const tx=banco.transaction(STORE_AUDIOS,'readwrite'); tx.objectStore(STORE_AUDIOS).put({recordId,blob,createdAt:new Date().toISOString()}); await concluirTransacao(tx); }
+  async function excluirAudioDiario(recordId) { if(modo!=='indexeddb') return; const tx=banco.transaction(STORE_AUDIOS,'readwrite'); tx.objectStore(STORE_AUDIOS).delete(recordId); await concluirTransacao(tx); }
+
+  return { inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado, buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca, buscarCaixaAcolhimento, salvarCaixaAcolhimento, excluirCaixaAcolhimento, buscarAudioDiario, salvarAudioDiario, excluirAudioDiario, informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS, STORE_ACOLHIMENTO, STORE_AUDIOS], modo }) };
 })();
