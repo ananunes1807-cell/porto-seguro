@@ -1,36 +1,49 @@
 # Porto Seguro — beta
 
+Aplicativo web de apoio emocional, respiração guiada e diário local. A frase central é: “Podemos te apoiar, mas, primeiramente, não se esqueça de você.”
+
 **Acesse o aplicativo:** [https://porto-seguro-ananunes.web.app](https://porto-seguro-ananunes.web.app)
 
-O Porto Seguro é um aplicativo web em desenvolvimento para acolhimento emocional, respiração guiada e registro privado em diário.
+## Recursos disponíveis
 
-## O que já funciona
+- fluxo de apoio progressivo, mensagem de regulação e opções de ajuda humana;
+- respiração em cinco ciclos (4 segundos inspirando e 6 soltando), com pausa, continuação, foco preso no diálogo e redução de movimento;
+- diário com título automático, sentimentos, intensidade, texto livre, campos “o que ajudou” e “o que piorou”;
+- criação e edição com data/hora, identificador preservado e histórico de versões;
+- pesquisa e filtros por sentimento e data;
+- exclusão confirmada, impressão individual ou geral e relatório por período/seleção;
+- backup JSON versionado e restauração por mesclagem sem duplicatas ou substituição confirmada;
+- contato de confiança local e atalhos manuais para CVV 188 e SAMU 192;
+- PWA instalável e funcional offline após o primeiro acesso.
 
-- área de apoio que aparece depois do clique;
-- respiração guiada em cinco ciclos (4 segundos inspirando e 6 soltando);
-- diário com data e hora automáticas;
-- título opcional, sentimento, intensidade de 0 a 10 e texto livre;
-- sugestão simples de sentimento, sem diagnóstico;
-- registros salvos somente no navegador do aparelho;
-- edição com preservação das versões anteriores;
-- exclusão com aviso;
-- impressão ou salvamento em PDF;
-- download de backup em JSON;
-- restauração de backup no próprio aplicativo;
-- funcionamento offline depois do primeiro acesso em um endereço publicado.
+## Executar localmente
 
-## Privacidade desta versão
+Na pasta do projeto, inicie um servidor HTTP simples, por exemplo:
 
-O conteúdo do diário usa `localStorage`: ele não é enviado ao GitHub nem a um banco de dados. Cada navegador e aparelho possui seus próprios registros. Duas pessoas que usem o mesmo navegador verão os mesmos registros. Limpar os dados do navegador também apaga o diário, por isso existem os botões de baixar e restaurar backup.
+```bash
+python -m http.server 8000
+```
 
-Esta versão é beta. O aplicativo não faz diagnóstico e não substitui atendimento profissional ou serviço de emergência.
+Abra `http://localhost:8000`. O servidor é necessário para testar o service worker e o modo offline.
 
-## Publicar com GitHub Pages
+## Dados e privacidade
 
-1. Envie todos os arquivos desta pasta para a raiz de um repositório público.
-2. No repositório, abra **Settings → Pages**.
-3. Em **Build and deployment**, escolha **Deploy from a branch**.
-4. Selecione a branch **main**, a pasta **/(root)** e clique em **Save**.
-5. Aguarde o endereço do site aparecer na mesma tela.
+Os registros usam `localStorage` versionado e não são enviados pelo aplicativo para GitHub, Firebase ou banco de dados. O armazenamento não é criptografado; outras pessoas no mesmo perfil do navegador podem acessar os dados, e limpar o navegador pode apagá-los. O modo anônimo não é adequado. Use **Baixar backup** regularmente e guarde o JSON onde preferir. Veja `privacidade.html`.
 
-Nenhum dado escrito no diário é incluído no repositório: somente o código do aplicativo é publicado.
+O Porto Seguro não diagnostica, não substitui terapia, atendimento médico ou serviço de emergência. Não há analytics, cookies publicitários ou coleta de informações.
+
+## Publicar no GitHub Pages
+
+1. Revise e envie os arquivos para a branch `main` de um repositório público.
+2. Abra **Settings → Pages** no GitHub.
+3. Em **Build and deployment**, selecione **Deploy from a branch**.
+4. Escolha `main` e `/(root)`, depois salve.
+5. Aguarde o endereço aparecer. Os caminhos do PWA são relativos e funcionam em subpastas do Pages.
+
+## Limitações atuais e próximos recursos
+
+- os dados não sincronizam entre aparelhos;
+- limites de `localStorage` variam por navegador;
+- o ícone atual é SVG; alguns dispositivos antigos podem exigir ícones PNG de 192 e 512 px;
+- áudio não foi incluído: uma versão futura deve solicitar microfone somente ao tocar em gravar e armazenar áudio localmente em IndexedDB;
+- IA online exigiria consentimento, política de privacidade e backend seguro; nenhuma chave de API existe neste projeto.

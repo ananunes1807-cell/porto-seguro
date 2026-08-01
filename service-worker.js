@@ -1,11 +1,12 @@
-const CACHE_NAME = 'porto-seguro-v1';
+const CACHE_NAME = 'porto-seguro-v2';
 const ARQUIVOS = [
     './',
     './index.html',
     './style.css',
     './script.js',
     './manifest.webmanifest',
-    './favicon.svg'
+    './favicon.svg',
+    './privacidade.html'
 ];
 
 self.addEventListener('install', (evento) => {
@@ -27,7 +28,7 @@ self.addEventListener('activate', (evento) => {
 });
 
 self.addEventListener('fetch', (evento) => {
-    if (evento.request.method !== 'GET') return;
+    if (evento.request.method !== 'GET' || new URL(evento.request.url).origin !== self.location.origin) return;
 
     evento.respondWith(
         fetch(evento.request)
