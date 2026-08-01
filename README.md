@@ -7,6 +7,9 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 ## Recursos disponíveis
 
 - fluxo de apoio progressivo, mensagem de regulação e opções de ajuda humana;
+- fluxo “Não consigo falar agora” com mensagens prontas, edição do texto e abertura manual do WhatsApp;
+- plano pessoal de segurança com sinais, gatilhos, estratégias, lugares seguros, profissionais e contatos, salvo localmente, imprimível e incluído no backup;
+- registro pós-crise com intensidade antes e depois, possível gatilho, estratégia, resultado e observações, integrado ao diário, aos relatórios e ao backup;
 - respiração em cinco ciclos (4 segundos inspirando e 6 soltando), com pausa, continuação, foco preso no diálogo e redução de movimento;
 - diário com título automático, sentimentos, intensidade, texto livre, campos “o que ajudou” e “o que piorou”;
 - criação e edição com data/hora, identificador preservado e histórico de versões;
