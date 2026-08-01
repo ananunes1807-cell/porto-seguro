@@ -1,169 +1,86 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#6f5bd3">
-    <meta name="description" content="Porto Seguro: acolhimento, respiração guiada e diário privado no seu aparelho.">
-    <title>Porto Seguro</title>
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#6f5bd3">
+  <meta name="description" content="Porto Seguro: acolhimento, respiração guiada e diário emocional local.">
+  <title>Porto Seguro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <main class="container">
-        <header class="cabecalho">
-            <span class="marca-icone" aria-hidden="true">♡</span>
-            <div>
-                <h1>Porto Seguro</h1>
-                <p>Podemos te apoiar, mas, primeiramente, não se esqueça de você.</p>
-            </div>
-        </header>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+  <header class="topo">
+    <a class="logo" href="#inicio" aria-label="Porto Seguro, início"><span aria-hidden="true">♡</span> Porto Seguro</a>
+    <nav aria-label="Navegação principal">
+      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="privacidade.html">Privacidade</a>
+    </nav>
+    <button id="aumentar-fonte" class="botao-discreto" type="button" aria-pressed="false">Aumentar texto</button>
+  </header>
 
-        <div class="acoes-principais">
-            <button class="botao-ajuda" type="button">
-                Não estou bem ou não sei o que está acontecendo
-            </button>
+  <main id="conteudo" class="container">
+    <section id="inicio" class="hero card">
+      <span class="marca-icone" aria-hidden="true">♡</span>
+      <div><p class="etiqueta">Um espaço no seu ritmo</p><h1>Porto Seguro</h1><p class="frase">Podemos te apoiar, mas, primeiramente, não se esqueça de você.</p>
+      <div class="acoes-principais"><button id="abrir-apoio" class="botao-primario" type="button">Não estou bem ou não sei o que está acontecendo</button><a class="botao-secundario" href="#diario">Abrir meu diário</a></div></div>
+    </section>
 
-            <button class="botao-diario" type="button" aria-expanded="false" aria-controls="area-diario">
-                Abrir meu diário
-            </button>
-        </div>
+    <section id="apoio" class="card" aria-labelledby="titulo-apoio">
+      <p class="etiqueta">Apoio</p><h2 id="titulo-apoio">Você não precisa explicar tudo agora.</h2><p>Escolha apenas o que parece possível neste momento.</p>
+      <div class="grade-acoes">
+        <button class="botao-acao" data-acao="respirar" type="button"><strong>Respirar comigo</strong><span>4 segundos inspirando, 6 soltando</span></button>
+        <button class="botao-acao" data-acao="escrever" type="button"><strong>Escrever o que aconteceu</strong><span>Ir direto para o diário</span></button>
+        <a class="botao-acao" href="#diario"><strong>Abrir meu diário</strong><span>Ver ou criar registros</span></a>
+        <button class="botao-acao" data-acao="regular" type="button"><strong>Ler uma mensagem de regulação</strong><span>Sem precisar responder perguntas</span></button>
+        <button class="botao-acao" data-acao="confianca" type="button"><strong>Falar com alguém de confiança</strong><span>Você decide se quer ligar</span></button>
+        <button class="botao-acao urgente" data-acao="urgente" type="button"><strong>Preciso de ajuda urgente</strong><span>Ver opções de apoio humano</span></button>
+      </div>
+      <div id="apoio-progressivo" class="apoio-progressivo" hidden aria-live="polite"></div>
+    </section>
 
-        <section id="area-apoio" class="area-apoio" hidden>
-            <h2>Estou aqui com você</h2>
-            <p>Vamos entender o que está acontecendo, um passo de cada vez.</p>
-            <p>Quer respirar comigo por alguns segundos?</p>
+    <section id="diario" class="card" aria-labelledby="titulo-diario">
+      <div class="cabecalho-secao"><div><p class="etiqueta">Salvo neste aparelho</p><h2 id="titulo-diario">Meu diário</h2><p>Escreva do seu jeito. Você não precisa organizar tudo agora.</p></div><span id="contador-registros" class="contador">0 registros</span></div>
+      <aside class="aviso"><strong>Privacidade local.</strong> O diário fica neste navegador, não é criptografado e pode ser visto por quem usa este perfil. Limpar os dados ou usar modo anônimo pode apagar os registros. Faça backups. <a href="privacidade.html">Entenda os limites</a>.</aside>
+      <p id="status-app" class="status" role="status" aria-live="polite"></p>
 
-            <button class="botao-respirar" type="button">
-                Respirar comigo
-            </button>
-        </section>
+      <form id="form-diario" class="formulario">
+        <input id="registro-id" type="hidden">
+        <div class="campo"><label for="titulo-registro">Título <span>(opcional)</span></label><input id="titulo-registro" type="text" autocomplete="off" placeholder="Se ficar vazio, criaremos um título localmente"></div>
+        <fieldset><legend>Como estou me sentindo?</legend><div class="sentimentos" id="sentimentos">
+          <label><input type="radio" name="sentimento" value="Ainda não sei dizer" checked><span>Ainda não sei dizer</span></label>
+          <label><input type="radio" name="sentimento" value="Calma"><span>Calma</span></label><label><input type="radio" name="sentimento" value="Felicidade"><span>Felicidade</span></label><label><input type="radio" name="sentimento" value="Tristeza"><span>Tristeza</span></label><label><input type="radio" name="sentimento" value="Ansiedade"><span>Ansiedade</span></label><label><input type="radio" name="sentimento" value="Irritação"><span>Irritação</span></label><label><input type="radio" name="sentimento" value="Cansaço"><span>Cansaço</span></label><label><input type="radio" name="sentimento" value="Confusão"><span>Confusão</span></label><label><input type="radio" name="sentimento" value="Medo"><span>Medo</span></label><label><input type="radio" name="sentimento" value="Frustração"><span>Frustração</span></label><label><input type="radio" name="sentimento" value="Sobrecarga"><span>Sobrecarga</span></label>
+        </div></fieldset>
+        <div class="campo"><div class="linha-label"><label for="intensidade-registro">Intensidade: <output id="valor-intensidade">5</output></label><label class="checkbox"><input id="intensidade-incerta" type="checkbox"> Não sei informar</label></div><input id="intensidade-registro" type="range" min="0" max="10" value="5"></div>
+        <div class="campo"><div class="linha-label"><label for="texto-registro">O que aconteceu ou está passando pela sua cabeça?</label><button id="sugerir-sentimento" class="botao-link" type="button">Sugerir sentimento</button></div><textarea id="texto-registro" rows="8" required placeholder="Escreva livremente..."></textarea><p id="mensagem-sugestao" class="ajuda" aria-live="polite"></p></div>
+        <div class="grade-dois"><div class="campo"><label for="ajudou-registro">O que me ajudou? <span>(opcional)</span></label><textarea id="ajudou-registro" rows="3"></textarea></div><div class="campo"><label for="piorou-registro">O que piorou? <span>(opcional)</span></label><textarea id="piorou-registro" rows="3"></textarea></div></div>
+        <p id="status-edicao" class="aviso-edicao" hidden>Você está editando. A versão anterior será preservada.</p>
+        <div class="acoes"><button id="salvar-registro" class="botao-primario" type="submit">Salvar no meu aparelho</button><button id="cancelar-edicao" class="botao-secundario" type="button" hidden>Cancelar edição</button></div>
+      </form>
 
-        <section id="area-diario" class="area-diario" hidden>
-            <div class="titulo-secao">
-                <div>
-                    <span class="etiqueta">Privado neste aparelho</span>
-                    <h2>Meu diário</h2>
-                    <p>Escreva do seu jeito. Você não precisa organizar tudo agora.</p>
-                </div>
-                <button id="fechar-diario" class="botao-icone" type="button" aria-label="Fechar diário">×</button>
-            </div>
+      <div class="ferramentas">
+        <div class="grade-filtros"><div class="campo"><label for="pesquisa">Pesquisar</label><input id="pesquisa" type="search" placeholder="Palavra no título ou texto"></div><div class="campo"><label for="filtro-sentimento">Sentimento</label><select id="filtro-sentimento"><option value="">Todos</option></select></div><div class="campo"><label for="filtro-data">Data</label><input id="filtro-data" type="date"></div></div>
+        <div class="acoes"><button id="limpar-filtros" class="botao-secundario" type="button">Limpar filtros</button><button id="imprimir-diario" class="botao-secundario" type="button">Imprimir todos</button><button id="baixar-backup" class="botao-secundario" type="button">Baixar backup</button><button id="restaurar-backup" class="botao-secundario" type="button">Restaurar backup</button><input id="arquivo-backup" type="file" accept="application/json,.json" hidden></div>
+      </div>
+      <div id="lista-registros" class="lista-registros"></div><p id="sem-resultados" class="vazio">Nenhum registro encontrado.</p>
+    </section>
 
-            <aside class="aviso-privacidade">
-                <strong>Onde fica salvo?</strong>
-                <p>Os registros ficam somente neste navegador e neste aparelho. Eles não são enviados ao GitHub nem para uma conta. Se duas pessoas usarem o mesmo navegador, verão os mesmos registros. Se os dados do navegador forem apagados, o diário também será apagado; faça um backup quando puder.</p>
-            </aside>
+    <section id="relatorios" class="card" aria-labelledby="titulo-relatorio"><p class="etiqueta">Para conversar depois</p><h2 id="titulo-relatorio">O que aconteceu comigo</h2><p>Gere um resumo dos registros de um período. Ele não é diagnóstico nem laudo.</p>
+      <form id="form-relatorio" class="formulario compacto"><div class="grade-dois"><div class="campo"><label for="relatorio-inicio">De</label><input id="relatorio-inicio" type="date"></div><div class="campo"><label for="relatorio-fim">Até</label><input id="relatorio-fim" type="date"></div></div><div class="campo"><label for="observacoes-relatorio">Observações para levar ao terapeuta ou médico</label><textarea id="observacoes-relatorio" rows="4"></textarea></div><button class="botao-primario" type="submit">Gerar relatório</button></form>
+      <div id="resultado-relatorio" class="resultado-relatorio" hidden><div class="cabecalho-secao"><h3>Resumo do período</h3><button id="imprimir-relatorio" class="botao-secundario" type="button">Imprimir ou salvar em PDF</button></div><div id="conteudo-relatorio"></div></div>
+    </section>
 
-            <form id="form-diario" class="form-diario">
-                <input id="registro-id" type="hidden">
+    <section id="sobre" class="card"><p class="etiqueta">Sobre</p><h2>Uma ferramenta, não um atendimento</h2><p>O Porto Seguro ajuda a respirar, registrar e organizar experiências. Não diagnostica e não substitui terapia, atendimento médico ou emergência.</p></section>
+  </main>
 
-                <div class="campo">
-                    <label for="titulo-registro">Título <span>(opcional)</span></label>
-                    <input id="titulo-registro" type="text" placeholder="Ex.: Um dia difícil">
-                </div>
+  <div id="tela-respiracao" class="modal" hidden><section class="modal-card respiracao" role="dialog" aria-modal="true" aria-labelledby="instrucao-respiracao"><p id="instrucao-respiracao" aria-live="assertive">Inspire devagar</p><strong id="numero-respiracao">4</strong><p id="ciclo-respiracao">Ciclo 1 de 5</p><p class="ajuda">Se sentir tontura ou desconforto, pare e respire normalmente.</p><div id="acoes-respiracao" class="acoes central"><button id="pausar-respiracao" class="botao-secundario" type="button">Pausar</button><button id="parar-respiracao" class="botao-secundario" type="button">Parar</button></div><div id="acoes-finais" hidden><button id="respirar-novamente" class="botao-primario" type="button">Respirar novamente</button><button id="registrar-apos-respirar" class="botao-secundario" type="button">Registrar como estou</button><button id="continuar-apoio" class="botao-secundario" type="button">Outras formas de apoio</button><button id="fechar-respiracao" class="botao-secundario" type="button">Fechar</button></div></section></div>
 
-                <div class="grade-campos">
-                    <div class="campo">
-                        <label for="sentimento-registro">Como estou me sentindo?</label>
-                        <input id="sentimento-registro" type="text" list="lista-sentimentos" placeholder="Pode deixar em branco">
-                        <datalist id="lista-sentimentos">
-                            <option value="Calma"></option>
-                            <option value="Alegria"></option>
-                            <option value="Ansiedade"></option>
-                            <option value="Tristeza"></option>
-                            <option value="Raiva"></option>
-                            <option value="Cansaço"></option>
-                            <option value="Medo"></option>
-                            <option value="Confusão"></option>
-                            <option value="Solidão"></option>
-                        </datalist>
-                    </div>
+  <div id="tela-urgente" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-urgente"><button class="fechar-modal" data-fechar="urgente" type="button" aria-label="Fechar">×</button><p class="etiqueta perigo">Ajuda humana</p><h2 id="titulo-urgente">Preciso de ajuda urgente</h2><p>O Porto Seguro não é um serviço de emergência. Você continua no controle e nenhuma ligação ou mensagem será feita sem você tocar em uma opção.</p><div class="grade-acoes"><a class="botao-acao" href="tel:188"><strong>Ligar para o CVV — 188</strong><span>Apoio emocional no Brasil</span></a><a class="botao-acao urgente" href="tel:192"><strong>Ligar para o SAMU — 192</strong><span>Emergência médica no Brasil</span></a><button id="ligar-confianca" class="botao-acao" type="button"><strong>Ligar para contato de confiança</strong><span id="nome-contato">Configure um contato abaixo</span></button></div><form id="form-contato" class="formulario compacto"><h3>Contato de confiança neste aparelho</h3><div class="grade-dois"><div class="campo"><label for="contato-nome">Nome</label><input id="contato-nome" type="text"></div><div class="campo"><label for="contato-telefone">Telefone</label><input id="contato-telefone" type="tel" inputmode="tel"></div></div><button class="botao-secundario" type="submit">Salvar contato localmente</button></form></section></div>
 
-                    <div class="campo">
-                        <label for="intensidade-registro">Intensidade</label>
-                        <select id="intensidade-registro">
-                            <option value="nao-sei">Não sei avaliar agora</option>
-                            <option value="0">0 — nenhuma</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5 — média</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                            <option value="10">10 — muito intensa</option>
-                        </select>
-                    </div>
-                </div>
+  <div id="tela-restauracao" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-restauracao"><h2 id="titulo-restauracao">Como deseja restaurar?</h2><p id="resumo-backup"></p><div class="acoes"><button id="mesclar-backup" class="botao-primario" type="button">Mesclar sem duplicar</button><button id="substituir-backup" class="botao-perigo" type="button">Substituir registros atuais</button><button id="cancelar-backup" class="botao-secundario" type="button">Cancelar</button></div></section></div>
 
-                <div class="campo">
-                    <div class="linha-label">
-                        <label for="texto-registro">O que aconteceu ou o que está passando pela sua cabeça?</label>
-                        <button id="sugerir-sentimento" class="botao-texto" type="button">Ajudar a identificar</button>
-                    </div>
-                    <textarea id="texto-registro" rows="8" required placeholder="Escreva livremente, sem limite de palavras..."></textarea>
-                    <p id="mensagem-sugestao" class="mensagem-sugestao" aria-live="polite"></p>
-                </div>
-
-                <p id="status-edicao" class="status-edicao" hidden>Você está editando um registro. A versão anterior será preservada no histórico deste aparelho.</p>
-
-                <div class="acoes-formulario">
-                    <button id="salvar-registro" class="botao-salvar" type="submit">Salvar no meu aparelho</button>
-                    <button id="cancelar-edicao" class="botao-cancelar" type="button" hidden>Cancelar edição</button>
-                </div>
-            </form>
-
-            <div class="barra-diario">
-                <div>
-                    <h3>Meus registros</h3>
-                    <p id="contador-registros">Nenhum registro salvo ainda.</p>
-                </div>
-                <div class="acoes-backup">
-                    <button id="imprimir-diario" class="botao-pequeno" type="button">Imprimir ou salvar em PDF</button>
-                    <button id="baixar-backup" class="botao-pequeno" type="button">Baixar backup</button>
-                    <button id="restaurar-backup" class="botao-pequeno" type="button">Restaurar backup</button>
-                    <input id="arquivo-backup" type="file" accept="application/json,.json" hidden>
-                </div>
-            </div>
-
-            <div id="lista-registros" class="lista-registros" aria-live="polite"></div>
-
-            <aside class="aviso-seguranca">
-                Este espaço ajuda a organizar sentimentos, mas não faz diagnóstico nem substitui atendimento profissional. Em risco imediato, procure um serviço de emergência ou alguém de confiança.
-            </aside>
-        </section>
-    </main>
-
-    <div id="tela-respiracao" class="tela-respiracao" hidden>
-        <div class="card-respiracao" role="dialog" aria-modal="true" aria-labelledby="instrucao-respiracao">
-            <p id="instrucao-respiracao">Inspire devagar</p>
-            <strong id="numero-respiracao">4</strong>
-            <button id="parar-respiracao" type="button">Parar</button>
-        </div>
-    </div>
-
-    <template id="modelo-registro">
-        <article class="card-registro">
-            <div class="cabecalho-registro">
-                <div>
-                    <h4 class="registro-titulo"></h4>
-                    <p class="registro-data"></p>
-                </div>
-                <span class="registro-intensidade"></span>
-            </div>
-            <p class="registro-sentimento"></p>
-            <p class="registro-texto"></p>
-            <p class="registro-edicao"></p>
-            <div class="acoes-registro">
-                <button class="editar-registro" type="button">Editar</button>
-                <button class="excluir-registro" type="button">Excluir</button>
-            </div>
-        </article>
-    </template>
-
-    <script src="script.js"></script>
+  <template id="modelo-registro"><article class="card-registro"><label class="selecionar"><input class="selecionar-registro" type="checkbox"> Incluir no relatório</label><div class="cabecalho-registro"><div><h3 class="registro-titulo"></h3><p class="registro-data"></p></div><span class="registro-intensidade"></span></div><p class="registro-sentimento"></p><p class="registro-texto"></p><div class="detalhes-registro"></div><p class="registro-edicao"></p><div class="acoes-registro"><button class="editar-registro" type="button">Editar</button><button class="imprimir-registro" type="button">Imprimir</button><button class="excluir-registro botao-perigo" type="button">Excluir</button></div></article></template>
+  <script src="script.js"></script>
 </body>
 </html>
