@@ -2,20 +2,74 @@
 const CHAVE = 'portoSeguro.diario.v2', CHAVE_ANTIGA = 'portoSeguro.diario.v1', CHAVE_CONTATO = 'portoSeguro.contato.v1', VERSAO = 2;
 const $ = (s, raiz = document) => raiz.querySelector(s), $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const armazenamento = window.PortoSeguroStorage;
-const estado = { registros: [], backup: null, armazenamentoPronto: false, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
+const estado = { registros: [], planoSeguranca: null, backup: null, armazenamentoPronto: false, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
+const CAMPOS_PLANO = ['sinais', 'gatilhos', 'ajuda', 'piora', 'lugares', 'contatos', 'profissionais', 'passos'];
 
 function idSeguro() { return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function dataValida(valor) { return typeof valor === 'string' && !Number.isNaN(Date.parse(valor)); }
+function normalizarPosCrise(item) {
+  if (!item || typeof item !== 'object') return null;
+  const intensidade = valor => Number.isInteger(valor) && valor >= 0 && valor <= 10 ? valor : null;
+  return { intensityBefore: intensidade(item.intensityBefore), intensityAfter: intensidade(item.intensityAfter), trigger: String(item.trigger || ''), strategy: String(item.strategy || ''), result: String(item.result || ''), notes: String(item.notes || '') };
+}
 function normalizarRegistro(item) {
   if (!item || typeof item.id !== 'string' || typeof item.text !== 'string' || !dataValida(item.createdAt)) return null;
-  return { id: item.id, title: String(item.title || gerarTitulo(item.text, item.createdAt)), feeling: String(item.feeling || 'Ainda não sei dizer'), intensity: Number.isInteger(item.intensity) && item.intensity >= 0 && item.intensity <= 10 ? item.intensity : null, text: item.text, helped: String(item.helped || ''), worsened: String(item.worsened || ''), strategies: Array.isArray(item.strategies) ? item.strategies.filter(x => typeof x === 'string') : [], createdAt: item.createdAt, updatedAt: dataValida(item.updatedAt) ? item.updatedAt : null, history: Array.isArray(item.history) ? item.history : [] };
+  return { id: item.id, title: String(item.title || gerarTitulo(item.text, item.createdAt)), feeling: String(item.feeling || 'Ainda não sei dizer'), intensity: Number.isInteger(item.intensity) && item.intensity >= 0 && item.intensity <= 10 ? item.intensity : null, text: item.text, helped: String(item.helped || ''), worsened: String(item.worsened || ''), strategies: Array.isArray(item.strategies) ? item.strategies.filter(x => typeof x === 'string') : [], createdAt: item.createdAt, updatedAt: dataValida(item.updatedAt) ? item.updatedAt : null, history: Array.isArray(item.history) ? item.history : [], postCrisis: normalizarPosCrise(item.postCrisis) };
 }
 function status(texto, erro = false) { const el = $('#status-app'); if (!el) return; el.textContent = texto; el.classList.toggle('erro', erro); }
-function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
+function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup','salvar-plano','apagar-plano','salvar-pos-crise'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
 function informarFalha(erro) { console.error('Operação de armazenamento não concluída:', erro?.name || 'Erro', erro?.message || 'sem detalhes'); status('Não foi possível concluir agora. Seus dados anteriores não foram apagados. Recomendamos manter seu backup em local seguro.', true); }
 function formatarData(valor) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(valor)); }
 function gerarTitulo(texto, data = new Date().toISOString()) { const inicio = String(texto).trim().replace(/\s+/g, ' ').split(' ').slice(0, 7).join(' '); return inicio ? `${inicio}${String(texto).trim().split(/\s+/).length > 7 ? '…' : ''}` : `Registro de ${new Intl.DateTimeFormat('pt-BR').format(new Date(data))}`; }
 function sentimentoSelecionado() { return $('input[name="sentimento"]:checked')?.value || 'Ainda não sei dizer'; }
+
+function normalizarPlano(item) {
+  if (!item || typeof item !== 'object') return null;
+  const plano = { id: 'plano-pessoal', updatedAt: dataValida(item.updatedAt) ? item.updatedAt : new Date().toISOString() };
+  CAMPOS_PLANO.forEach(campo => { plano[campo] = String(item[campo] || ''); });
+  return plano;
+}
+function preencherPlano(plano) {
+  CAMPOS_PLANO.forEach(campo => { $(`#plano-${campo}`).value = plano?.[campo] || ''; });
+  $('#estado-plano').textContent = plano?.updatedAt ? `Atualizado em ${formatarData(plano.updatedAt)}` : 'Ainda não salvo';
+}
+function planoDoFormulario() {
+  const plano = { id: 'plano-pessoal', updatedAt: new Date().toISOString() };
+  CAMPOS_PLANO.forEach(campo => { plano[campo] = $(`#plano-${campo}`).value.trim(); });
+  return plano;
+}
+async function salvarPlano(evento) {
+  evento.preventDefault();
+  const plano = planoDoFormulario();
+  if (!CAMPOS_PLANO.some(campo => plano[campo])) { $('#status-plano').textContent = 'Preencha pelo menos um campo antes de salvar.'; return; }
+  const botao = $('#salvar-plano'); botao.disabled = true;
+  try { await armazenamento.salvarPlanoSeguranca(plano); estado.planoSeguranca = plano; preencherPlano(plano); $('#status-plano').textContent = 'Plano salvo somente neste aparelho.'; }
+  catch (erro) { console.error('Plano pessoal não salvo:', erro?.name || 'Erro'); $('#status-plano').textContent = 'Não foi possível salvar o plano neste navegador. Nenhum dado anterior foi apagado.'; }
+  finally { botao.disabled = false; }
+}
+async function apagarPlano() {
+  if (!estado.planoSeguranca) { $('#status-plano').textContent = 'Ainda não há um plano salvo.'; return; }
+  if (!confirm('Apagar todo o plano pessoal deste aparelho? Essa ação não pode ser desfeita.')) return;
+  try { await armazenamento.excluirPlanoSeguranca(); estado.planoSeguranca = null; preencherPlano(null); $('#status-plano').textContent = 'Plano apagado deste aparelho.'; }
+  catch (erro) { console.error('Plano pessoal não apagado:', erro?.name || 'Erro'); $('#status-plano').textContent = 'Não foi possível apagar o plano agora.'; }
+}
+function limparPosCrise() {
+  $('#form-pos-crise').reset(); $('#pos-valor-antes').textContent = '5'; $('#pos-valor-depois').textContent = '5'; $('#pos-intensidade-antes').disabled = false; $('#pos-intensidade-depois').disabled = false;
+}
+async function salvarPosCrise(evento) {
+  evento.preventDefault();
+  if (!estado.armazenamentoPronto) { $('#status-pos-crise').textContent = 'Aguarde enquanto preparamos o armazenamento local.'; return; }
+  const agora = new Date().toISOString();
+  const postCrisis = { intensityBefore: $('#pos-incerta-antes').checked ? null : Number($('#pos-intensidade-antes').value), intensityAfter: $('#pos-incerta-depois').checked ? null : Number($('#pos-intensidade-depois').value), trigger: $('#pos-gatilho').value.trim(), strategy: $('#pos-estrategia').value.trim(), result: $('#pos-resultado').value.trim(), notes: $('#pos-observacoes').value.trim() };
+  if (!postCrisis.trigger && !postCrisis.strategy && !postCrisis.result && !postCrisis.notes && postCrisis.intensityBefore === null && postCrisis.intensityAfter === null) { $('#status-pos-crise').textContent = 'Preencha ao menos uma informação antes de salvar.'; return; }
+  const antes = postCrisis.intensityBefore === null ? 'não informada' : `${postCrisis.intensityBefore}/10`, depois = postCrisis.intensityAfter === null ? 'não informada' : `${postCrisis.intensityAfter}/10`;
+  const partes = [`Intensidade antes: ${antes}. Intensidade depois: ${depois}.`, postCrisis.trigger && `Possível gatilho: ${postCrisis.trigger}`, postCrisis.strategy && `Estratégia utilizada: ${postCrisis.strategy}`, postCrisis.result && `Resultado percebido: ${postCrisis.result}`, postCrisis.notes && `Para lembrar ou conversar depois: ${postCrisis.notes}`].filter(Boolean);
+  const registro = { id: idSeguro(), title: `Registro pós-crise — ${new Intl.DateTimeFormat('pt-BR').format(new Date(agora))}`, feeling: 'Ainda não sei dizer', intensity: postCrisis.intensityAfter, text: partes.join('\n\n') || 'Registro pós-crise de intensidade.', helped: postCrisis.result, worsened: postCrisis.trigger, strategies: postCrisis.strategy ? [postCrisis.strategy] : [], createdAt: agora, updatedAt: null, history: [], postCrisis };
+  const botao = $('#salvar-pos-crise'); botao.disabled = true;
+  try { await armazenamento.salvar(registro); estado.registros.unshift(registro); limparPosCrise(); renderizar(); $('#status-pos-crise').textContent = 'Registro pós-crise salvo no diário deste aparelho.'; }
+  catch (erro) { console.error('Registro pós-crise não salvo:', erro?.name || 'Erro'); $('#status-pos-crise').textContent = 'Não foi possível salvar agora. Nenhum registro anterior foi apagado.'; }
+  finally { botao.disabled = false; }
+}
 
 function limparFormulario() {
   $('#form-diario').reset(); $('#registro-id').value = ''; $('#valor-intensidade').textContent = '5'; $('#intensidade-registro').disabled = false; $('#status-edicao').hidden = true; $('#cancelar-edicao').hidden = true; $('#salvar-registro').textContent = 'Salvar no meu aparelho'; $('#mensagem-sugestao').textContent = '';
@@ -60,6 +114,7 @@ function renderizar() {
     const frag = $('#modelo-registro').content.cloneNode(true), card = $('.card-registro', frag); card.dataset.id = r.id;
     $('.registro-titulo', frag).textContent = r.title; $('.registro-data', frag).textContent = `Criado em ${formatarData(r.createdAt)}`; $('.registro-intensidade', frag).textContent = r.intensity === null ? 'Intensidade: não sei' : `Intensidade: ${r.intensity}/10`; $('.registro-sentimento', frag).textContent = `Sentimento: ${r.feeling}`; $('.registro-texto', frag).textContent = r.text; $('.selecionar-registro', frag).value = r.id;
     const detalhes = $('.detalhes-registro', frag); if (r.helped) { const p = document.createElement('p'); p.textContent = `O que ajudou: ${r.helped}`; detalhes.append(p); } if (r.worsened) { const p = document.createElement('p'); p.textContent = `O que piorou: ${r.worsened}`; detalhes.append(p); }
+    if (r.postCrisis) { const p = document.createElement('p'); p.textContent = 'Tipo: registro pós-crise'; detalhes.prepend(p); $('.editar-registro', frag).remove(); }
     const ed = $('.registro-edicao', frag); if (r.updatedAt) ed.textContent = `Editado em ${formatarData(r.updatedAt)} · ${r.history.length} versão(ões) anterior(es)`; else ed.remove();
     lista.append(frag);
   });
@@ -75,19 +130,22 @@ function sugerir() {
 async function baixarBackup() {
   try {
     const registros = await armazenamento.buscarTodos();
-    if (!registros.length) return alert('Ainda não há registros para o backup.');
-    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 1, createdAt: new Date().toISOString(), entries: registros }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado. Guarde o arquivo em um local escolhido por você.');
+    const planoSeguranca = await armazenamento.buscarPlanoSeguranca();
+    if (!registros.length && !planoSeguranca) return alert('Ainda não há diário ou plano pessoal para o backup.');
+    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 2, createdAt: new Date().toISOString(), entries: registros, safetyPlan: planoSeguranca }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado com o diário e o plano pessoal. Guarde o arquivo em um local escolhido por você.');
   } catch (erro) { informarFalha(erro); }
 }
 function lerBackup(evento) {
   const arquivo = evento.target.files[0]; evento.target.value = ''; if (!arquivo || arquivo.size > 10_000_000) return status('Arquivo ausente ou maior que 10 MB.', true);
-  const leitor = new FileReader(); leitor.onload = () => { try { const b = JSON.parse(leitor.result); if (b.app !== 'Porto Seguro' || !Array.isArray(b.entries)) throw Error('Formato não reconhecido.'); const validos = b.entries.map(normalizarRegistro).filter(Boolean); if (!validos.length || validos.length !== b.entries.length) throw Error('Há registros inválidos no arquivo.'); estado.backup = validos; $('#resumo-backup').textContent = `${validos.length} registro(s) válido(s). Mesclar mantém os atuais e evita IDs duplicados; substituir apaga os atuais.`; abrirModal($('#tela-restauracao')); } catch (e) { status(`Não foi possível restaurar: ${e.message}`, true); } }; leitor.onerror = () => status('Não foi possível ler o arquivo.', true); leitor.readAsText(arquivo);
+  const leitor = new FileReader(); leitor.onload = () => { try { const b = JSON.parse(leitor.result); if (b.app !== 'Porto Seguro' || !Array.isArray(b.entries)) throw Error('Formato não reconhecido.'); const validos = b.entries.map(normalizarRegistro).filter(Boolean); if (validos.length !== b.entries.length || (!validos.length && !b.safetyPlan)) throw Error('Não há dados válidos no arquivo.'); const plano = b.safetyPlan ? normalizarPlano(b.safetyPlan) : null; estado.backup = { registros: validos, plano }; $('#resumo-backup').textContent = `${validos.length} registro(s) válido(s)${plano ? ' e um plano pessoal' : ''}. Mesclar mantém os atuais; substituir apaga os registros atuais. Se houver um plano no arquivo, ele substituirá o plano atual.`; abrirModal($('#tela-restauracao')); } catch (e) { status(`Não foi possível restaurar: ${e.message}`, true); } }; leitor.onerror = () => status('Não foi possível ler o arquivo.', true); leitor.readAsText(arquivo);
 }
 async function aplicarBackup(substituir) {
   if (!estado.backup) return; if (substituir && !confirm('Isso substituirá todos os registros atuais. Deseja continuar?')) return;
   try {
-    await armazenamento.importar(estado.backup, substituir);
+    await armazenamento.importar(estado.backup.registros, substituir);
+    if (estado.backup.plano) await armazenamento.salvarPlanoSeguranca(estado.backup.plano);
     estado.registros = await armazenamento.buscarTodos();
+    estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca);
     fecharModal($('#tela-restauracao')); renderizar(); status(`Backup ${substituir ? 'restaurado, substituindo' : 'mesclado com'} os registros atuais.`); estado.backup = null;
   } catch (erro) { informarFalha(erro); }
 }
@@ -96,6 +154,14 @@ function imprimirRegistros(lista, titulo) {
   const janela = open('', '_blank'); if (!janela) return status('Permita a janela de impressão no navegador.', true); janela.opener = null;
   const escapar = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   janela.document.write(`<!doctype html><meta charset="utf-8"><title>${escapar(titulo)}</title><style>body{font:16px/1.5 Arial;max-width:800px;margin:40px auto;color:#302b45}article{border-bottom:1px solid #ccc;padding:16px 0;white-space:pre-wrap}small{color:#655f77}@media print{body{margin:0}}</style><h1>${escapar(titulo)}</h1>${lista.map(r => `<article><h2>${escapar(r.title)}</h2><small>${escapar(formatarData(r.createdAt))} · ${escapar(r.feeling)} · Intensidade ${r.intensity ?? 'não informada'}</small><p>${escapar(r.text)}</p>${r.helped ? `<p><b>O que ajudou:</b> ${escapar(r.helped)}</p>` : ''}${r.worsened ? `<p><b>O que piorou:</b> ${escapar(r.worsened)}</p>` : ''}</article>`).join('')}<script>onload=()=>print()<\/script>`); janela.document.close();
+}
+function imprimirPlano() {
+  const plano = planoDoFormulario();
+  if (!CAMPOS_PLANO.some(campo => plano[campo])) { $('#status-plano').textContent = 'Preencha o plano antes de imprimir.'; return; }
+  const janela = open('', '_blank'); if (!janela) { $('#status-plano').textContent = 'Permita a janela de impressão no navegador.'; return; }
+  janela.opener = null; const escapar = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const titulos = { sinais:'Sinais de alerta', gatilhos:'Gatilhos que reconheço', ajuda:'O que costuma me ajudar', piora:'O que costuma piorar', lugares:'Lugares seguros', contatos:'Pessoas e contatos de confiança', profissionais:'Profissionais e serviços', passos:'Passos que gostaria de seguir' };
+  janela.document.write(`<!doctype html><meta charset="utf-8"><title>Meu plano pessoal de segurança</title><style>body{font:16px/1.5 Arial;max-width:800px;margin:40px auto;color:#302b45}section{border-top:1px solid #ccc;padding:12px 0;white-space:pre-wrap}small{color:#655f77}@media print{body{margin:0}}</style><h1>Meu plano pessoal de segurança</h1><p><small>Porto Seguro · documento pessoal, não substitui atendimento profissional ou emergência.</small></p>${CAMPOS_PLANO.filter(campo=>plano[campo]).map(campo=>`<section><h2>${escapar(titulos[campo])}</h2><p>${escapar(plano[campo])}</p></section>`).join('')}<script>onload=()=>print()<\/script>`); janela.document.close();
 }
 function gerarRelatorio(evento) {
   evento.preventDefault(); const inicio = $('#relatorio-inicio').value, fim = $('#relatorio-fim').value, selecionados = new Set($$('.selecionar-registro:checked').map(x => x.value));
@@ -124,23 +190,52 @@ function mostrarApoio(tipo) {
 }
 function contato() { try { return JSON.parse(localStorage.getItem(CHAVE_CONTATO)||'null'); } catch { return null; } }
 function atualizarContato() { const c=contato(); $('#nome-contato').textContent=c?.name?`Conversar com ${c.name}`:'Configure um contato abaixo'; $('#contato-nome').value=c?.name||''; $('#contato-telefone').value=c?.phone||''; $('#contato-mensagem').value=c?.message||'Não estou bem agora. Não precisa resolver nada, apenas fique comigo e, se puder, entre em contato.'; }
+function abrirMensagemRapida() {
+  const c=contato(), campo=$('#mensagem-rapida-texto');
+  $$('.mensagem-pronta').forEach(botao=>botao.classList.remove('selecionada'));
+  campo.value=''; $('#status-mensagem-rapida').textContent='';
+  $('#destino-mensagem-rapida').textContent=c?.name?`A conversa será aberta com ${c.name}.`:'Configure um contato de confiança para abrir a conversa correta.';
+  abrirModal($('#tela-mensagem-rapida'));
+}
+function escolherMensagem(botao) {
+  $$('.mensagem-pronta').forEach(item=>item.classList.toggle('selecionada',item===botao));
+  $('#mensagem-rapida-texto').value=botao.textContent.trim(); $('#mensagem-rapida-texto').focus();
+}
+function abrirWhatsAppMensagemRapida() {
+  const c=contato(), mensagem=$('#mensagem-rapida-texto').value.trim();
+  if(!mensagem){$('#status-mensagem-rapida').textContent='Escolha ou escreva uma mensagem primeiro.';return $('#mensagem-rapida-texto').focus()}
+  if(!c?.phone){$('#status-mensagem-rapida').textContent='Configure um contato de confiança antes de abrir o WhatsApp.';return $('#configurar-contato-mensagem').focus()}
+  window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(mensagem)}`,'_blank','noopener,noreferrer');
+  $('#status-mensagem-rapida').textContent='WhatsApp aberto com a mensagem preenchida. Confirme o envio no próprio WhatsApp.';
+}
+async function copiarMensagemRapida() {
+  const campo=$('#mensagem-rapida-texto'), mensagem=campo.value.trim();
+  if(!mensagem){$('#status-mensagem-rapida').textContent='Escolha ou escreva uma mensagem primeiro.';return campo.focus()}
+  try { if(navigator.clipboard?.writeText) await navigator.clipboard.writeText(mensagem); else {campo.select();document.execCommand('copy');campo.setSelectionRange(0,0)} $('#status-mensagem-rapida').textContent='Mensagem copiada. Você decide onde e quando enviar.'; }
+  catch { $('#status-mensagem-rapida').textContent='Não foi possível copiar automaticamente. Selecione o texto e copie manualmente.'; }
+}
 
 document.addEventListener('click', e => {
-  const acao=e.target.closest('[data-acao]')?.dataset.acao; if (acao==='respirar') iniciarRespiracao(); if (acao==='escrever') { location.hash='diario'; $('#texto-registro').focus(); } if (acao==='regular'||acao==='confianca') mostrarApoio(acao); if (acao==='urgente') { atualizarContato(); abrirModal($('#tela-urgente')); }
+  const acao=e.target.closest('[data-acao]')?.dataset.acao; if (acao==='respirar') iniciarRespiracao(); if (acao==='escrever') { location.hash='diario'; $('#texto-registro').focus(); } if (acao==='regular'||acao==='confianca') mostrarApoio(acao); if (acao==='nao-consigo-falar') abrirMensagemRapida(); if (acao==='urgente') { atualizarContato(); abrirModal($('#tela-urgente')); }
   const card=e.target.closest('.card-registro'); if (card && e.target.matches('.editar-registro')) editar(card.dataset.id); if (card && e.target.matches('.excluir-registro')) excluir(card.dataset.id); if (card && e.target.matches('.imprimir-registro')) imprimirRegistros(estado.registros.filter(r=>r.id===card.dataset.id),'Registro — Porto Seguro');
 });
 $('#abrir-apoio').addEventListener('click',()=>{location.hash='apoio';mostrarApoio('perguntas')}); $('#form-diario').addEventListener('submit',salvarRegistro); $('#cancelar-edicao').addEventListener('click',()=>{limparFormulario();status('Edição cancelada; nenhuma alteração foi salva.')}); $('#intensidade-registro').addEventListener('input',e=>$('#valor-intensidade').textContent=e.target.value); $('#intensidade-incerta').addEventListener('change',e=>{ $('#intensidade-registro').disabled=e.target.checked; $('#valor-intensidade').textContent=e.target.checked?'—':$('#intensidade-registro').value }); $('#sugerir-sentimento').addEventListener('click',sugerir);
 ['pesquisa','filtro-sentimento','filtro-data'].forEach(id=>$('#'+id).addEventListener('input',renderizar)); $('#limpar-filtros').addEventListener('click',()=>{$('#pesquisa').value='';$('#filtro-sentimento').value='';$('#filtro-data').value='';renderizar()}); $('#baixar-backup').addEventListener('click',baixarBackup); $('#restaurar-backup').addEventListener('click',()=>$('#arquivo-backup').click()); $('#arquivo-backup').addEventListener('change',lerBackup); $('#mesclar-backup').addEventListener('click',()=>aplicarBackup(false)); $('#substituir-backup').addEventListener('click',()=>aplicarBackup(true)); $('#cancelar-backup').addEventListener('click',()=>{estado.backup=null;fecharModal($('#tela-restauracao'))}); $('#imprimir-diario').addEventListener('click',()=>imprimirRegistros(registrosVisiveis(),'Meu diário — Porto Seguro'));
-$('#form-relatorio').addEventListener('submit',gerarRelatorio); $('#imprimir-relatorio').addEventListener('click',()=>print()); $('#pausar-respiracao').addEventListener('click',()=>{const r=estado.respiracao;r.pausada=!r.pausada;atualizarRespiracao()}); $('#parar-respiracao').addEventListener('click',pararRespiracao); $('#fechar-respiracao').addEventListener('click',pararRespiracao); $('#respirar-novamente').addEventListener('click',iniciarRespiracao); $('#registrar-apos-respirar').addEventListener('click',registrarEstrategia); $('#continuar-apoio').addEventListener('click',()=>{pararRespiracao();location.hash='apoio';mostrarApoio('perguntas')}); $('.fechar-modal').addEventListener('click',()=>fecharModal($('#tela-urgente')));
+$('#form-relatorio').addEventListener('submit',gerarRelatorio); $('#imprimir-relatorio').addEventListener('click',()=>print()); $('#pausar-respiracao').addEventListener('click',()=>{const r=estado.respiracao;r.pausada=!r.pausada;atualizarRespiracao()}); $('#parar-respiracao').addEventListener('click',pararRespiracao); $('#fechar-respiracao').addEventListener('click',pararRespiracao); $('#respirar-novamente').addEventListener('click',iniciarRespiracao); $('#registrar-apos-respirar').addEventListener('click',registrarEstrategia); $('#continuar-apoio').addEventListener('click',()=>{pararRespiracao();location.hash='apoio';mostrarApoio('perguntas')}); $$('.fechar-modal').forEach(botao=>botao.addEventListener('click',()=>fecharModal(botao.closest('.modal'))));
+$('#lista-mensagens-prontas').addEventListener('click',e=>{const botao=e.target.closest('.mensagem-pronta');if(botao)escolherMensagem(botao)}); $('#abrir-whatsapp-mensagem').addEventListener('click',abrirWhatsAppMensagemRapida); $('#copiar-mensagem').addEventListener('click',copiarMensagemRapida); $('#configurar-contato-mensagem').addEventListener('click',()=>{fecharModal($('#tela-mensagem-rapida'));atualizarContato();abrirModal($('#tela-urgente'));$('#contato-nome').focus()});
 $('#form-contato').addEventListener('submit',e=>{e.preventDefault();const name=$('#contato-nome').value.trim(),phone=$('#contato-telefone').value.replace(/\D/g,''),message=$('#contato-mensagem').value.trim();if(!name||phone.length<10||phone.length>15||!message)return status('Informe nome, WhatsApp com DDI e uma mensagem.',true);try{localStorage.setItem(CHAVE_CONTATO,JSON.stringify({name,phone,message}));atualizarContato();status('Contato e mensagem salvos somente neste navegador.')}catch{status('Não foi possível salvar o contato.',true)}}); $('#whatsapp-confianca').addEventListener('click',()=>{const c=contato();if(!c?.phone||!c?.message){$('#contato-nome').focus();return status('Configure e salve o contato antes de abrir o WhatsApp.',true)}window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(c.message)}`,'_blank','noopener,noreferrer');status('WhatsApp aberto com a mensagem preenchida. Confirme o envio no próprio WhatsApp.')});
 $('#aumentar-fonte').addEventListener('click',e=>{const ativo=document.body.classList.toggle('fonte-grande');e.currentTarget.setAttribute('aria-pressed',ativo);e.currentTarget.textContent=ativo?'Texto padrão':'Aumentar texto'});
 document.addEventListener('keydown',e=>{const modal=$$('.modal').find(m=>!m.hidden);if(!modal)return;if(e.key==='Escape'){modal=== $('#tela-respiracao')?pararRespiracao():fecharModal(modal)}else prenderFoco(e,modal)});
+$('#form-plano-seguranca').addEventListener('submit',salvarPlano); $('#imprimir-plano').addEventListener('click',imprimirPlano); $('#apagar-plano').addEventListener('click',apagarPlano);
+$('#form-pos-crise').addEventListener('submit',salvarPosCrise); $('#limpar-pos-crise').addEventListener('click',()=>{limparPosCrise();$('#status-pos-crise').textContent='Campos limpos; nada foi salvo.';});
+['antes','depois'].forEach(sufixo=>{const faixa=$(`#pos-intensidade-${sufixo}`), incerta=$(`#pos-incerta-${sufixo}`), valor=$(`#pos-valor-${sufixo}`); faixa.addEventListener('input',()=>{valor.textContent=faixa.value}); incerta.addEventListener('change',()=>{faixa.disabled=incerta.checked;valor.textContent=incerta.checked?'—':faixa.value});});
 
 async function inicializarAplicacao() {
   alternarControlesArmazenamento(false);
   status('Preparando o armazenamento local…');
   const resultado = await armazenamento.inicializar({ chaveAtual: CHAVE, chaveAntiga: CHAVE_ANTIGA, versaoBackup: VERSAO, normalizarRegistro });
   estado.registros = resultado.registros;
+  try { estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca); } catch (erro) { console.error('Plano pessoal indisponível:', erro?.name || 'Erro'); $('#status-plano').textContent = 'O plano pessoal não está disponível neste navegador.'; }
   estado.armazenamentoPronto = true;
   alternarControlesArmazenamento(true);
   renderizar();

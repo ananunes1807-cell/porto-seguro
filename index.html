@@ -15,7 +15,7 @@
   <header class="topo">
     <a class="logo" href="#inicio" aria-label="Porto Seguro, início"><span aria-hidden="true">♡</span> Porto Seguro</a>
     <nav aria-label="Navegação principal">
-      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="privacidade.html">Privacidade</a>
+      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#plano-seguranca">Meu plano</a><a href="#pos-crise">Pós-crise</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="privacidade.html">Privacidade</a>
     </nav>
     <button id="aumentar-fonte" class="botao-discreto" type="button" aria-pressed="false">Aumentar texto</button>
   </header>
@@ -35,9 +35,51 @@
         <a class="botao-acao" href="#diario"><strong>Abrir meu diário</strong><span>Ver ou criar registros</span></a>
         <button class="botao-acao" data-acao="regular" type="button"><strong>Ler uma mensagem de regulação</strong><span>Sem precisar responder perguntas</span></button>
         <button class="botao-acao" data-acao="confianca" type="button"><strong>Falar com alguém de confiança</strong><span>Você decide se quer ligar</span></button>
+        <button class="botao-acao" data-acao="nao-consigo-falar" type="button"><strong>Não consigo falar agora</strong><span>Escolher uma mensagem pronta</span></button>
         <button class="botao-acao urgente" data-acao="urgente" type="button"><strong>Preciso de ajuda urgente</strong><span>Ver opções de apoio humano</span></button>
       </div>
       <div id="apoio-progressivo" class="apoio-progressivo" hidden aria-live="polite"></div>
+    </section>
+
+    <section id="plano-seguranca" class="card" aria-labelledby="titulo-plano-seguranca">
+      <div class="cabecalho-secao"><div><p class="etiqueta">Preparado no seu ritmo</p><h2 id="titulo-plano-seguranca">Meu plano pessoal de segurança</h2><p>Registre o que você percebe e o que pode ajudar em momentos difíceis. Você pode preencher aos poucos.</p></div><span id="estado-plano" class="contador">Ainda não salvo</span></div>
+      <aside class="aviso"><strong>Este plano não substitui ajuda profissional ou emergência.</strong> Ele fica somente neste navegador, no IndexedDB, e será incluído no backup quando estiver salvo.</aside>
+      <form id="form-plano-seguranca" class="formulario">
+        <div class="grade-dois">
+          <div class="campo"><label for="plano-sinais">Sinais de que uma crise pode estar começando</label><textarea id="plano-sinais" rows="5" placeholder="Ex.: dificuldade para dormir, vontade de me isolar..."></textarea></div>
+          <div class="campo"><label for="plano-gatilhos">Situações ou gatilhos que reconheço</label><textarea id="plano-gatilhos" rows="5" placeholder="Inclua somente o que se sentir confortável em registrar."></textarea></div>
+        </div>
+        <div class="grade-dois">
+          <div class="campo"><label for="plano-ajuda">O que costuma me ajudar</label><textarea id="plano-ajuda" rows="5" placeholder="Pessoas, atividades, exercícios ou cuidados..."></textarea></div>
+          <div class="campo"><label for="plano-piora">O que costuma piorar</label><textarea id="plano-piora" rows="5" placeholder="Atitudes, ambientes ou situações que prefiro evitar..."></textarea></div>
+        </div>
+        <div class="grade-dois">
+          <div class="campo"><label for="plano-lugares">Lugares onde me sinto mais seguro(a)</label><textarea id="plano-lugares" rows="4"></textarea></div>
+          <div class="campo"><label for="plano-contatos">Pessoas e contatos de confiança</label><textarea id="plano-contatos" rows="4" placeholder="Nome, relação e forma de contato."></textarea></div>
+        </div>
+        <div class="grade-dois">
+          <div class="campo"><label for="plano-profissionais">Profissionais e serviços que me acompanham</label><textarea id="plano-profissionais" rows="4" placeholder="Nome, especialidade e contato."></textarea></div>
+          <div class="campo"><label for="plano-passos">Passos que gostaria de seguir quando precisar</label><textarea id="plano-passos" rows="4" placeholder="Ex.: ir para um local seguro, respirar, chamar alguém..."></textarea></div>
+        </div>
+        <p id="status-plano" class="status" role="status" aria-live="polite"></p>
+        <div class="acoes"><button id="salvar-plano" class="botao-primario" type="submit">Salvar plano neste aparelho</button><button id="imprimir-plano" class="botao-secundario" type="button">Imprimir ou salvar em PDF</button><button id="apagar-plano" class="botao-perigo" type="button">Apagar plano</button></div>
+      </form>
+    </section>
+
+    <section id="pos-crise" class="card" aria-labelledby="titulo-pos-crise">
+      <p class="etiqueta">Depois de um momento difícil</p><h2 id="titulo-pos-crise">Registro pós-crise</h2><p>Preencha apenas o que conseguir. Este registro será salvo no diário e poderá aparecer nos relatórios para uma conversa futura.</p>
+      <form id="form-pos-crise" class="formulario compacto">
+        <div class="grade-dois">
+          <div class="campo"><div class="linha-label"><label for="pos-intensidade-antes">Intensidade antes: <output id="pos-valor-antes">5</output></label><label class="checkbox"><input id="pos-incerta-antes" type="checkbox"> Não sei informar</label></div><input id="pos-intensidade-antes" type="range" min="0" max="10" value="5"></div>
+          <div class="campo"><div class="linha-label"><label for="pos-intensidade-depois">Intensidade agora: <output id="pos-valor-depois">5</output></label><label class="checkbox"><input id="pos-incerta-depois" type="checkbox"> Não sei informar</label></div><input id="pos-intensidade-depois" type="range" min="0" max="10" value="5"></div>
+        </div>
+        <div class="campo"><label for="pos-gatilho">O que pode ter desencadeado esse momento? <span>(opcional)</span></label><textarea id="pos-gatilho" rows="4" placeholder="Tudo bem se você ainda não souber."></textarea></div>
+        <div class="campo"><label for="pos-estrategia">O que você tentou fazer para atravessar esse momento? <span>(opcional)</span></label><textarea id="pos-estrategia" rows="4" placeholder="Ex.: respiração, silêncio, companhia, sair do ambiente..."></textarea></div>
+        <div class="campo"><label for="pos-resultado">O que ajudou, não ajudou ou fez diferença? <span>(opcional)</span></label><textarea id="pos-resultado" rows="4"></textarea></div>
+        <div class="campo"><label for="pos-observacoes">Algo que gostaria de lembrar ou conversar depois? <span>(opcional)</span></label><textarea id="pos-observacoes" rows="4"></textarea></div>
+        <p id="status-pos-crise" class="status" role="status" aria-live="polite"></p>
+        <div class="acoes"><button id="salvar-pos-crise" class="botao-primario" type="submit">Salvar no diário</button><button id="limpar-pos-crise" class="botao-secundario" type="button">Limpar campos</button></div>
+      </form>
     </section>
 
     <section id="diario" class="card" aria-labelledby="titulo-diario">
@@ -75,6 +117,8 @@
   </main>
 
   <div id="tela-respiracao" class="modal" hidden><section class="modal-card respiracao" role="dialog" aria-modal="true" aria-labelledby="instrucao-respiracao"><p id="instrucao-respiracao" aria-live="assertive">Inspire devagar</p><strong id="numero-respiracao">4</strong><p id="ciclo-respiracao">Ciclo 1 de 5</p><p class="ajuda">Se sentir tontura ou desconforto, pare e respire normalmente.</p><div id="acoes-respiracao" class="acoes central"><button id="pausar-respiracao" class="botao-secundario" type="button">Pausar</button><button id="parar-respiracao" class="botao-secundario" type="button">Parar</button></div><div id="acoes-finais" hidden><button id="respirar-novamente" class="botao-primario" type="button">Respirar novamente</button><button id="registrar-apos-respirar" class="botao-secundario" type="button">Registrar como estou</button><button id="continuar-apoio" class="botao-secundario" type="button">Outras formas de apoio</button><button id="fechar-respiracao" class="botao-secundario" type="button">Fechar</button></div></section></div>
+
+  <div id="tela-mensagem-rapida" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-mensagem-rapida"><button class="fechar-modal" type="button" aria-label="Fechar mensagens prontas">×</button><p class="etiqueta">No seu ritmo</p><h2 id="titulo-mensagem-rapida">Não consigo falar agora</h2><p>Escolha uma mensagem. Você pode ajustar o texto antes de abrir o WhatsApp.</p><div id="lista-mensagens-prontas" class="lista-mensagens"><button class="mensagem-pronta" type="button">Não estou bem. Não precisa resolver nada, apenas fique comigo.</button><button class="mensagem-pronta" type="button">Estou com dificuldade para falar. Você pode me ligar ou ficar comigo por mensagem?</button><button class="mensagem-pronta" type="button">Preciso de companhia agora. Pode me responder quando vir esta mensagem?</button><button class="mensagem-pronta" type="button">Não consigo explicar o que está acontecendo. Só preciso saber que você está comigo.</button></div><div class="campo"><label for="mensagem-rapida-texto">Mensagem escolhida</label><textarea id="mensagem-rapida-texto" rows="5"></textarea><p id="destino-mensagem-rapida" class="ajuda"></p></div><p id="status-mensagem-rapida" class="status" role="status" aria-live="polite"></p><div class="acoes"><button id="abrir-whatsapp-mensagem" class="botao-primario" type="button">Abrir WhatsApp</button><button id="copiar-mensagem" class="botao-secundario" type="button">Copiar mensagem</button><button id="configurar-contato-mensagem" class="botao-secundario" type="button">Configurar contato</button></div><p class="ajuda">Nada é enviado automaticamente. O WhatsApp abrirá a conversa e você decidirá se quer enviar.</p></section></div>
 
   <div id="tela-urgente" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-urgente"><button class="fechar-modal" data-fechar="urgente" type="button" aria-label="Fechar">×</button><p class="etiqueta perigo">Ajuda humana</p><h2 id="titulo-urgente">Preciso de ajuda urgente</h2><p>O Porto Seguro não é um serviço de emergência. Você continua no controle: nenhuma ligação será feita e nenhuma mensagem será enviada sem sua confirmação.</p><div class="grade-acoes"><a class="botao-acao" href="tel:188"><strong>Ligar para o CVV — 188</strong><span>Apoio emocional no Brasil</span></a><a class="botao-acao urgente" href="tel:192"><strong>Ligar para o SAMU — 192</strong><span>Emergência médica no Brasil</span></a><button id="whatsapp-confianca" class="botao-acao" type="button"><strong>Abrir WhatsApp com mensagem</strong><span id="nome-contato">Configure um contato abaixo</span></button></div><form id="form-contato" class="formulario compacto"><h3>Contato de confiança neste aparelho</h3><div class="grade-dois"><div class="campo"><label for="contato-nome">Nome</label><input id="contato-nome" type="text" autocomplete="name"></div><div class="campo"><label for="contato-telefone">WhatsApp com DDI</label><input id="contato-telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ex.: 5511999999999"></div></div><div class="campo"><label for="contato-mensagem">Mensagem preparada</label><textarea id="contato-mensagem" rows="4">Não estou bem agora. Não precisa resolver nada, apenas fique comigo e, se puder, entre em contato.</textarea><p class="ajuda">Ao tocar no botão, o WhatsApp abrirá esta conversa com o texto preenchido. Você ainda precisará tocar em enviar.</p></div><button class="botao-secundario" type="submit">Salvar contato e mensagem localmente</button></form></section></div>
 
