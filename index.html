@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6f5bd3">
+    <meta name="description" content="Porto Seguro: acolhimento, respiração guiada e diário privado no seu aparelho.">
+    <title>Porto Seguro</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="container">
+        <header class="cabecalho">
+            <span class="marca-icone" aria-hidden="true">♡</span>
+            <div>
+                <h1>Porto Seguro</h1>
+                <p>Podemos te apoiar, mas, primeiramente, não se esqueça de você.</p>
+            </div>
+        </header>
+
+        <div class="acoes-principais">
+            <button class="botao-ajuda" type="button">
+                Não estou bem ou não sei o que está acontecendo
+            </button>
+
+            <button class="botao-diario" type="button" aria-expanded="false" aria-controls="area-diario">
+                Abrir meu diário
+            </button>
+        </div>
+
+        <section id="area-apoio" class="area-apoio" hidden>
+            <h2>Estou aqui com você</h2>
+            <p>Vamos entender o que está acontecendo, um passo de cada vez.</p>
+            <p>Quer respirar comigo por alguns segundos?</p>
+
+            <button class="botao-respirar" type="button">
+                Respirar comigo
+            </button>
+        </section>
+
+        <section id="area-diario" class="area-diario" hidden>
+            <div class="titulo-secao">
+                <div>
+                    <span class="etiqueta">Privado neste aparelho</span>
+                    <h2>Meu diário</h2>
+                    <p>Escreva do seu jeito. Você não precisa organizar tudo agora.</p>
+                </div>
+                <button id="fechar-diario" class="botao-icone" type="button" aria-label="Fechar diário">×</button>
+            </div>
+
+            <aside class="aviso-privacidade">
+                <strong>Onde fica salvo?</strong>
+                <p>Os registros ficam somente neste navegador e neste aparelho. Eles não são enviados ao GitHub nem para uma conta. Se duas pessoas usarem o mesmo navegador, verão os mesmos registros. Se os dados do navegador forem apagados, o diário também será apagado; faça um backup quando puder.</p>
+            </aside>
+
+            <form id="form-diario" class="form-diario">
+                <input id="registro-id" type="hidden">
+
+                <div class="campo">
+                    <label for="titulo-registro">Título <span>(opcional)</span></label>
+                    <input id="titulo-registro" type="text" placeholder="Ex.: Um dia difícil">
+                </div>
+
+                <div class="grade-campos">
+                    <div class="campo">
+                        <label for="sentimento-registro">Como estou me sentindo?</label>
+                        <input id="sentimento-registro" type="text" list="lista-sentimentos" placeholder="Pode deixar em branco">
+                        <datalist id="lista-sentimentos">
+                            <option value="Calma"></option>
+                            <option value="Alegria"></option>
+                            <option value="Ansiedade"></option>
+                            <option value="Tristeza"></option>
+                            <option value="Raiva"></option>
+                            <option value="Cansaço"></option>
+                            <option value="Medo"></option>
+                            <option value="Confusão"></option>
+                            <option value="Solidão"></option>
+                        </datalist>
+                    </div>
+
+                    <div class="campo">
+                        <label for="intensidade-registro">Intensidade</label>
+                        <select id="intensidade-registro">
+                            <option value="nao-sei">Não sei avaliar agora</option>
+                            <option value="0">0 — nenhuma</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5 — média</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10 — muito intensa</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="campo">
+                    <div class="linha-label">
+                        <label for="texto-registro">O que aconteceu ou o que está passando pela sua cabeça?</label>
+                        <button id="sugerir-sentimento" class="botao-texto" type="button">Ajudar a identificar</button>
+                    </div>
+                    <textarea id="texto-registro" rows="8" required placeholder="Escreva livremente, sem limite de palavras..."></textarea>
+                    <p id="mensagem-sugestao" class="mensagem-sugestao" aria-live="polite"></p>
+                </div>
+
+                <p id="status-edicao" class="status-edicao" hidden>Você está editando um registro. A versão anterior será preservada no histórico deste aparelho.</p>
+
+                <div class="acoes-formulario">
+                    <button id="salvar-registro" class="botao-salvar" type="submit">Salvar no meu aparelho</button>
+                    <button id="cancelar-edicao" class="botao-cancelar" type="button" hidden>Cancelar edição</button>
+                </div>
+            </form>
+
+            <div class="barra-diario">
+                <div>
+                    <h3>Meus registros</h3>
+                    <p id="contador-registros">Nenhum registro salvo ainda.</p>
+                </div>
+                <div class="acoes-backup">
+                    <button id="imprimir-diario" class="botao-pequeno" type="button">Imprimir ou salvar em PDF</button>
+                    <button id="baixar-backup" class="botao-pequeno" type="button">Baixar backup</button>
+                    <button id="restaurar-backup" class="botao-pequeno" type="button">Restaurar backup</button>
+                    <input id="arquivo-backup" type="file" accept="application/json,.json" hidden>
+                </div>
+            </div>
+
+            <div id="lista-registros" class="lista-registros" aria-live="polite"></div>
+
+            <aside class="aviso-seguranca">
+                Este espaço ajuda a organizar sentimentos, mas não faz diagnóstico nem substitui atendimento profissional. Em risco imediato, procure um serviço de emergência ou alguém de confiança.
+            </aside>
+        </section>
+    </main>
+
+    <div id="tela-respiracao" class="tela-respiracao" hidden>
+        <div class="card-respiracao" role="dialog" aria-modal="true" aria-labelledby="instrucao-respiracao">
+            <p id="instrucao-respiracao">Inspire devagar</p>
+            <strong id="numero-respiracao">4</strong>
+            <button id="parar-respiracao" type="button">Parar</button>
+        </div>
+    </div>
+
+    <template id="modelo-registro">
+        <article class="card-registro">
+            <div class="cabecalho-registro">
+                <div>
+                    <h4 class="registro-titulo"></h4>
+                    <p class="registro-data"></p>
+                </div>
+                <span class="registro-intensidade"></span>
+            </div>
+            <p class="registro-sentimento"></p>
+            <p class="registro-texto"></p>
+            <p class="registro-edicao"></p>
+            <div class="acoes-registro">
+                <button class="editar-registro" type="button">Editar</button>
+                <button class="excluir-registro" type="button">Excluir</button>
+            </div>
+        </article>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>

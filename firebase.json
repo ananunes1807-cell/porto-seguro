@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      ".git/**",
+      ".github/**",
+      "porto-seguro-beta-github.zip"
+    ],
+    "cleanUrls": true
+  }
+}

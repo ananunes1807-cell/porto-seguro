@@ -1,0 +1,19 @@
+{
+    "name": "Porto Seguro",
+    "short_name": "Porto Seguro",
+    "description": "Acolhimento, respiração guiada e diário privado no seu aparelho.",
+    "lang": "pt-BR",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#f3f0ff",
+    "theme_color": "#6f5bd3",
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
