@@ -3,12 +3,15 @@
 // Camada única de persistência do diário. A interface nunca acessa IndexedDB diretamente.
 window.PortoSeguroStorage = (() => {
   const NOME_BANCO = 'portoSeguroDB';
-  const VERSAO_BANCO = 3;
+  const VERSAO_BANCO = 4;
   const STORE_REGISTROS = 'registros';
   const STORE_METADADOS = 'metadados';
   const STORE_PLANOS = 'planosSeguranca';
   const STORE_ACOLHIMENTO = 'caixaAcolhimento';
   const STORE_AUDIOS = 'audiosDiario';
+  const STORE_PERFIL = 'perfilAcolhimento';
+  const STORE_FEEDBACK = 'feedbackApoio';
+  const STORE_RELATORIOS = 'relatoriosSalvos';
   const META_MIGRACAO = 'migracaoLocalStorageV1';
   let banco = null;
   let modo = 'indexeddb';
@@ -46,6 +49,9 @@ window.PortoSeguroStorage = (() => {
         if (!db.objectStoreNames.contains(STORE_PLANOS)) db.createObjectStore(STORE_PLANOS, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(STORE_ACOLHIMENTO)) db.createObjectStore(STORE_ACOLHIMENTO, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(STORE_AUDIOS)) db.createObjectStore(STORE_AUDIOS, { keyPath: 'recordId' });
+        if (!db.objectStoreNames.contains(STORE_PERFIL)) db.createObjectStore(STORE_PERFIL, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_FEEDBACK)) db.createObjectStore(STORE_FEEDBACK, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_RELATORIOS)) db.createObjectStore(STORE_RELATORIOS, { keyPath: 'id' });
       };
       abertura.onsuccess = () => {
         banco = abertura.result;
@@ -188,6 +194,12 @@ window.PortoSeguroStorage = (() => {
   async function buscarAudioDiario(recordId) { if(modo!=='indexeddb') return null; const tx=banco.transaction(STORE_AUDIOS,'readonly'); return requisicao(tx.objectStore(STORE_AUDIOS).get(recordId)); }
   async function salvarAudioDiario(recordId, blob) { if(modo!=='indexeddb') throw new Error('IndexedDB indisponível.'); const tx=banco.transaction(STORE_AUDIOS,'readwrite'); tx.objectStore(STORE_AUDIOS).put({recordId,blob,createdAt:new Date().toISOString()}); await concluirTransacao(tx); }
   async function excluirAudioDiario(recordId) { if(modo!=='indexeddb') return; const tx=banco.transaction(STORE_AUDIOS,'readwrite'); tx.objectStore(STORE_AUDIOS).delete(recordId); await concluirTransacao(tx); }
+  async function buscarPerfilAcolhimento(){if(modo!=='indexeddb')return null;const tx=banco.transaction(STORE_PERFIL,'readonly');return requisicao(tx.objectStore(STORE_PERFIL).get('meu-perfil'))}
+  async function salvarPerfilAcolhimento(perfil){if(modo!=='indexeddb')throw new Error('IndexedDB indisponível.');const tx=banco.transaction(STORE_PERFIL,'readwrite');tx.objectStore(STORE_PERFIL).put({...perfil,id:'meu-perfil'});await concluirTransacao(tx)}
+  async function excluirPerfilAcolhimento(){if(modo!=='indexeddb')return;const tx=banco.transaction(STORE_PERFIL,'readwrite');tx.objectStore(STORE_PERFIL).delete('meu-perfil');await concluirTransacao(tx)}
+  async function buscarFeedbackApoio(){if(modo!=='indexeddb')return[];const tx=banco.transaction(STORE_FEEDBACK,'readonly');return requisicao(tx.objectStore(STORE_FEEDBACK).getAll())}
+  async function salvarFeedbackApoio(item){if(modo!=='indexeddb')return;const tx=banco.transaction(STORE_FEEDBACK,'readwrite');tx.objectStore(STORE_FEEDBACK).put(item);await concluirTransacao(tx)}
+  async function salvarRelatorio(item){if(modo!=='indexeddb')throw new Error('IndexedDB indisponível.');const tx=banco.transaction(STORE_RELATORIOS,'readwrite');tx.objectStore(STORE_RELATORIOS).put(item);await concluirTransacao(tx)}
 
-  return { inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado, buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca, buscarCaixaAcolhimento, salvarCaixaAcolhimento, excluirCaixaAcolhimento, buscarAudioDiario, salvarAudioDiario, excluirAudioDiario, informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS, STORE_ACOLHIMENTO, STORE_AUDIOS], modo }) };
+  return { inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado, buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca, buscarCaixaAcolhimento, salvarCaixaAcolhimento, excluirCaixaAcolhimento, buscarAudioDiario, salvarAudioDiario, excluirAudioDiario, buscarPerfilAcolhimento, salvarPerfilAcolhimento, excluirPerfilAcolhimento, buscarFeedbackApoio, salvarFeedbackApoio, salvarRelatorio, informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS, STORE_ACOLHIMENTO, STORE_AUDIOS, STORE_PERFIL, STORE_FEEDBACK, STORE_RELATORIOS], modo }) };
 })();
