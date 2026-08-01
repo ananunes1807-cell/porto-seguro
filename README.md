@@ -13,7 +13,7 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - pesquisa e filtros por sentimento e data;
 - exclusão confirmada, impressão individual ou geral e relatório por período/seleção;
 - backup JSON versionado e restauração por mesclagem sem duplicatas ou substituição confirmada;
-- contato de confiança local e atalhos manuais para CVV 188 e SAMU 192;
+- contato de confiança por WhatsApp com mensagem preparada, confirmação manual de envio e atalhos para CVV 188 e SAMU 192;
 - PWA instalável e funcional offline após o primeiro acesso.
 
 ## Executar localmente
