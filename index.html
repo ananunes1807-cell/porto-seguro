@@ -15,7 +15,7 @@
   <header class="topo">
     <a class="logo" href="#inicio" aria-label="Porto Seguro, início"><span aria-hidden="true">♡</span> Porto Seguro</a>
     <nav aria-label="Navegação principal">
-      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#plano-seguranca">Meu plano</a><a href="#pos-crise">Pós-crise</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="privacidade.html">Privacidade</a>
+      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#plano-seguranca">Meu plano</a><a href="#pos-crise">Pós-crise</a><a href="#caixa-acolhimento">Minha caixa</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="privacidade.html">Privacidade</a>
     </nav>
     <button id="aumentar-fonte" class="botao-discreto" type="button" aria-pressed="false">Aumentar texto</button>
   </header>
@@ -82,6 +82,17 @@
       </form>
     </section>
 
+    <section id="caixa-acolhimento" class="card" aria-labelledby="titulo-caixa">
+      <p class="etiqueta">Para reencontrar o que acolhe</p><h2 id="titulo-caixa">Minha caixa de acolhimento</h2><p>Monte este espaço aos poucos. Textos, foto e áudio ficam somente neste navegador e não são enviados pela internet.</p>
+      <form id="form-caixa" class="formulario">
+        <div class="grade-dois"><div class="campo"><label for="caixa-mensagem">Mensagem que gostaria de ler</label><textarea id="caixa-mensagem" rows="5"></textarea></div><div class="campo"><label for="caixa-funciona">O que costuma funcionar comigo</label><textarea id="caixa-funciona" rows="5"></textarea></div></div>
+        <div class="grade-dois"><div class="campo"><label for="caixa-lembranca">Lembrança segura</label><textarea id="caixa-lembranca" rows="4"></textarea></div><div class="campo"><label for="caixa-exercicio">Exercício de aterramento preferido</label><textarea id="caixa-exercicio" rows="4" placeholder="Ex.: observar 5 coisas que vejo, 4 que sinto..."></textarea></div></div>
+        <div class="grade-dois"><div class="campo"><label for="caixa-foto">Foto segura <span>(opcional, até 4 MB)</span></label><input id="caixa-foto" type="file" accept="image/jpeg,image/png,image/webp"><div id="preview-caixa-foto"></div></div><div class="campo"><label for="caixa-audio">Áudio de acolhimento <span>(opcional, até 6 MB)</span></label><input id="caixa-audio" type="file" accept="audio/*"><div id="preview-caixa-audio"></div></div></div>
+        <p class="ajuda">Fotos e áudios ocupam mais espaço e não entram no backup JSON. Mantenha também uma cópia original desses arquivos.</p><p id="status-caixa" class="status" role="status" aria-live="polite"></p>
+        <div class="acoes"><button id="salvar-caixa" class="botao-primario" type="submit">Salvar minha caixa</button><button id="apagar-caixa" class="botao-perigo" type="button">Apagar caixa</button></div>
+      </form>
+    </section>
+
     <section id="diario" class="card" aria-labelledby="titulo-diario">
       <div class="cabecalho-secao"><div><p class="etiqueta">Salvo neste aparelho</p><h2 id="titulo-diario">Meu diário</h2><p>Escreva do seu jeito. Você não precisa organizar tudo agora.</p></div><span id="contador-registros" class="contador">0 registros</span></div>
       <aside class="aviso"><strong>Privacidade local.</strong> O diário fica no IndexedDB deste navegador e não é criptografado. Celular e computador ainda não sincronizam; cada endereço do site mantém dados separados. Limpar os dados ou usar modo anônimo pode apagar os registros. Faça backups. <a href="privacidade.html">Entenda os limites</a>.</aside>
@@ -97,6 +108,7 @@
         <div class="campo"><div class="linha-label"><label for="intensidade-registro">Intensidade: <output id="valor-intensidade">5</output></label><label class="checkbox"><input id="intensidade-incerta" type="checkbox"> Não sei informar</label></div><input id="intensidade-registro" type="range" min="0" max="10" value="5"></div>
         <div class="campo"><div class="linha-label"><label for="texto-registro">O que aconteceu ou está passando pela sua cabeça?</label><button id="sugerir-sentimento" class="botao-link" type="button">Sugerir sentimento</button></div><textarea id="texto-registro" rows="8" required placeholder="Escreva livremente..."></textarea><p id="mensagem-sugestao" class="ajuda" aria-live="polite"></p></div>
         <div class="grade-dois"><div class="campo"><label for="ajudou-registro">O que me ajudou? <span>(opcional)</span></label><textarea id="ajudou-registro" rows="3"></textarea></div><div class="campo"><label for="piorou-registro">O que piorou? <span>(opcional)</span></label><textarea id="piorou-registro" rows="3"></textarea></div></div>
+        <fieldset class="audio-diario"><legend>Áudio no diário <span>(opcional)</span></legend><p class="ajuda">O microfone só será solicitado ao tocar em gravar. Ouça ou descarte antes de salvar; o áudio fica neste aparelho.</p><div class="acoes"><button id="gravar-audio" class="botao-secundario" type="button">Gravar áudio</button><button id="parar-audio" class="botao-secundario" type="button" disabled>Parar gravação</button><button id="descartar-audio" class="botao-perigo" type="button" hidden>Descartar áudio</button></div><audio id="preview-audio-diario" controls hidden></audio><p id="status-audio" class="status" role="status" aria-live="polite"></p></fieldset>
         <p id="status-edicao" class="aviso-edicao" hidden>Você está editando. A versão anterior será preservada.</p>
         <div class="acoes"><button id="salvar-registro" class="botao-primario" type="submit">Salvar no meu aparelho</button><button id="cancelar-edicao" class="botao-secundario" type="button" hidden>Cancelar edição</button></div>
       </form>
@@ -124,7 +136,7 @@
 
   <div id="tela-restauracao" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-restauracao"><h2 id="titulo-restauracao">Como deseja restaurar?</h2><p id="resumo-backup"></p><div class="acoes"><button id="mesclar-backup" class="botao-primario" type="button">Mesclar sem duplicar</button><button id="substituir-backup" class="botao-perigo" type="button">Substituir registros atuais</button><button id="cancelar-backup" class="botao-secundario" type="button">Cancelar</button></div></section></div>
 
-  <template id="modelo-registro"><article class="card-registro"><label class="selecionar"><input class="selecionar-registro" type="checkbox"> Incluir no relatório</label><div class="cabecalho-registro"><div><h3 class="registro-titulo"></h3><p class="registro-data"></p></div><span class="registro-intensidade"></span></div><p class="registro-sentimento"></p><p class="registro-texto"></p><div class="detalhes-registro"></div><p class="registro-edicao"></p><div class="acoes-registro"><button class="editar-registro" type="button">Editar</button><button class="imprimir-registro" type="button">Imprimir</button><button class="excluir-registro botao-perigo" type="button">Excluir</button></div></article></template>
+  <template id="modelo-registro"><article class="card-registro"><label class="selecionar"><input class="selecionar-registro" type="checkbox"> Incluir no relatório</label><div class="cabecalho-registro"><div><h3 class="registro-titulo"></h3><p class="registro-data"></p></div><span class="registro-intensidade"></span></div><p class="registro-sentimento"></p><p class="registro-texto"></p><div class="detalhes-registro"></div><div class="registro-audio"></div><p class="registro-edicao"></p><div class="acoes-registro"><button class="editar-registro" type="button">Editar</button><button class="imprimir-registro" type="button">Imprimir</button><button class="excluir-registro botao-perigo" type="button">Excluir</button></div></article></template>
   <script src="storage.js"></script>
   <script src="script.js"></script>
 </body>
