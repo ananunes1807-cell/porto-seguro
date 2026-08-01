@@ -1,7 +1,8 @@
 'use strict';
 const CHAVE = 'portoSeguro.diario.v2', CHAVE_ANTIGA = 'portoSeguro.diario.v1', CHAVE_CONTATO = 'portoSeguro.contato.v1', VERSAO = 2;
 const $ = (s, raiz = document) => raiz.querySelector(s), $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
-const estado = { registros: [], backup: null, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
+const armazenamento = window.PortoSeguroStorage;
+const estado = { registros: [], backup: null, armazenamentoPronto: false, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
 
 function idSeguro() { return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function dataValida(valor) { return typeof valor === 'string' && !Number.isNaN(Date.parse(valor)); }
@@ -9,20 +10,9 @@ function normalizarRegistro(item) {
   if (!item || typeof item.id !== 'string' || typeof item.text !== 'string' || !dataValida(item.createdAt)) return null;
   return { id: item.id, title: String(item.title || gerarTitulo(item.text, item.createdAt)), feeling: String(item.feeling || 'Ainda não sei dizer'), intensity: Number.isInteger(item.intensity) && item.intensity >= 0 && item.intensity <= 10 ? item.intensity : null, text: item.text, helped: String(item.helped || ''), worsened: String(item.worsened || ''), strategies: Array.isArray(item.strategies) ? item.strategies.filter(x => typeof x === 'string') : [], createdAt: item.createdAt, updatedAt: dataValida(item.updatedAt) ? item.updatedAt : null, history: Array.isArray(item.history) ? item.history : [] };
 }
-function carregar() {
-  try {
-    const atual = JSON.parse(localStorage.getItem(CHAVE) || 'null');
-    const origem = atual?.entries || JSON.parse(localStorage.getItem(CHAVE_ANTIGA) || '[]');
-    const registros = (Array.isArray(origem) ? origem : []).map(normalizarRegistro).filter(Boolean);
-    if (!atual && registros.length) persistir(registros);
-    return registros;
-  } catch (erro) { console.error('Falha ao ler o diário.', erro); status('Não foi possível ler os registros deste navegador.', true); return []; }
-}
-function persistir(lista = estado.registros) {
-  try { localStorage.setItem(CHAVE, JSON.stringify({ version: VERSAO, updatedAt: new Date().toISOString(), entries: lista })); return true; }
-  catch (erro) { console.error('Falha ao salvar o diário.', erro); status('Não foi possível salvar. O armazenamento pode estar cheio ou indisponível. Faça backup do que puder.', true); return false; }
-}
 function status(texto, erro = false) { const el = $('#status-app'); if (!el) return; el.textContent = texto; el.classList.toggle('erro', erro); }
+function alternarControlesArmazenamento(habilitados) { ['salvar-registro','baixar-backup','restaurar-backup'].forEach(id => { $('#'+id).disabled = !habilitados; }); }
+function informarFalha(erro) { console.error('Operação de armazenamento não concluída:', erro?.name || 'Erro', erro?.message || 'sem detalhes'); status('Não foi possível concluir agora. Seus dados anteriores não foram apagados. Recomendamos manter seu backup em local seguro.', true); }
 function formatarData(valor) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(valor)); }
 function gerarTitulo(texto, data = new Date().toISOString()) { const inicio = String(texto).trim().replace(/\s+/g, ' ').split(' ').slice(0, 7).join(' '); return inicio ? `${inicio}${String(texto).trim().split(/\s+/).length > 7 ? '…' : ''}` : `Registro de ${new Intl.DateTimeFormat('pt-BR').format(new Date(data))}`; }
 function sentimentoSelecionado() { return $('input[name="sentimento"]:checked')?.value || 'Ainda não sei dizer'; }
@@ -30,17 +20,23 @@ function sentimentoSelecionado() { return $('input[name="sentimento"]:checked')?
 function limparFormulario() {
   $('#form-diario').reset(); $('#registro-id').value = ''; $('#valor-intensidade').textContent = '5'; $('#intensidade-registro').disabled = false; $('#status-edicao').hidden = true; $('#cancelar-edicao').hidden = true; $('#salvar-registro').textContent = 'Salvar no meu aparelho'; $('#mensagem-sugestao').textContent = '';
 }
-function salvarRegistro(evento) {
+async function salvarRegistro(evento) {
   evento.preventDefault(); const texto = $('#texto-registro').value.trim(); if (!texto) return $('#texto-registro').focus();
+  if (!estado.armazenamentoPronto) return status('Aguarde enquanto preparamos o armazenamento local.', true);
   const agora = new Date().toISOString(), id = $('#registro-id').value, indice = estado.registros.findIndex(r => r.id === id);
   const dados = { title: $('#titulo-registro').value.trim() || gerarTitulo(texto, agora), feeling: sentimentoSelecionado(), intensity: $('#intensidade-incerta').checked ? null : Number($('#intensidade-registro').value), text: texto, helped: $('#ajudou-registro').value.trim(), worsened: $('#piorou-registro').value.trim() };
-  const anteriores = [...estado.registros];
+  let registro;
   if (indice >= 0) {
     const anterior = estado.registros[indice], versao = { title: anterior.title, feeling: anterior.feeling, intensity: anterior.intensity, text: anterior.text, helped: anterior.helped, worsened: anterior.worsened, savedAt: anterior.updatedAt || anterior.createdAt };
-    estado.registros[indice] = { ...anterior, ...dados, updatedAt: agora, history: [...anterior.history, versao] };
-  } else estado.registros.unshift({ id: idSeguro(), ...dados, strategies: [], createdAt: agora, updatedAt: null, history: [] });
-  if (!persistir()) { estado.registros = anteriores; return; }
-  limparFormulario(); renderizar(); status(indice >= 0 ? 'Alterações salvas. A versão anterior foi preservada.' : 'Registro salvo neste aparelho.');
+    registro = { ...anterior, ...dados, updatedAt: agora, history: [...anterior.history, versao] };
+  } else registro = { id: idSeguro(), ...dados, strategies: [], createdAt: agora, updatedAt: null, history: [] };
+  const botao = $('#salvar-registro'); botao.disabled = true;
+  try {
+    await armazenamento.salvar(registro);
+    if (indice >= 0) estado.registros[indice] = registro; else estado.registros.unshift(registro);
+    limparFormulario(); renderizar(); status(indice >= 0 ? 'Alterações salvas. A versão anterior foi preservada.' : 'Registro salvo neste aparelho.');
+  } catch (erro) { informarFalha(erro); }
+  finally { botao.disabled = false; }
 }
 function editar(id) {
   const r = estado.registros.find(x => x.id === id); if (!r) return;
@@ -48,9 +44,10 @@ function editar(id) {
   const radio = $(`input[name="sentimento"][value="${CSS.escape(r.feeling)}"]`) || $('input[name="sentimento"]'); radio.checked = true;
   $('#intensidade-incerta').checked = r.intensity === null; $('#intensidade-registro').disabled = r.intensity === null; $('#intensidade-registro').value = r.intensity ?? 5; $('#valor-intensidade').textContent = r.intensity ?? '—'; $('#status-edicao').hidden = false; $('#cancelar-edicao').hidden = false; $('#salvar-registro').textContent = 'Salvar alterações'; $('#form-diario').scrollIntoView({ behavior: movimento(), block: 'start' }); $('#titulo-registro').focus({ preventScroll: true });
 }
-function excluir(id) {
+async function excluir(id) {
   const r = estado.registros.find(x => x.id === id); if (!r || !confirm(`ATENÇÃO: excluir “${r.title}” apagará também seu histórico. Essa ação não pode ser desfeita. Deseja continuar?`)) return;
-  const anterior = estado.registros; estado.registros = estado.registros.filter(x => x.id !== id); if (!persistir()) { estado.registros = anterior; return; } if ($('#registro-id').value === id) limparFormulario(); renderizar(); status('Registro excluído deste aparelho.');
+  try { await armazenamento.excluir(id); estado.registros = estado.registros.filter(x => x.id !== id); if ($('#registro-id').value === id) limparFormulario(); renderizar(); status('Registro excluído deste aparelho.'); }
+  catch (erro) { informarFalha(erro); }
 }
 function filtros() { return { busca: $('#pesquisa').value.trim().toLocaleLowerCase('pt-BR'), sentimento: $('#filtro-sentimento').value, data: $('#filtro-data').value }; }
 function registrosVisiveis() {
@@ -75,18 +72,24 @@ function sugerir() {
   if (/(me matar|suicid|não quero viver|vou me machucar)/i.test(texto)) $('#mensagem-sugestao').textContent += ' Talvez você precise de apoio humano agora. Você gostaria de ver as opções de ajuda?';
 }
 
-function baixarBackup() {
-  if (!estado.registros.length) return alert('Ainda não há registros para o backup.');
-  const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, createdAt: new Date().toISOString(), entries: estado.registros }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado. Guarde o arquivo em um local escolhido por você.');
+async function baixarBackup() {
+  try {
+    const registros = await armazenamento.buscarTodos();
+    if (!registros.length) return alert('Ainda não há registros para o backup.');
+    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 1, createdAt: new Date().toISOString(), entries: registros }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado. Guarde o arquivo em um local escolhido por você.');
+  } catch (erro) { informarFalha(erro); }
 }
 function lerBackup(evento) {
   const arquivo = evento.target.files[0]; evento.target.value = ''; if (!arquivo || arquivo.size > 10_000_000) return status('Arquivo ausente ou maior que 10 MB.', true);
   const leitor = new FileReader(); leitor.onload = () => { try { const b = JSON.parse(leitor.result); if (b.app !== 'Porto Seguro' || !Array.isArray(b.entries)) throw Error('Formato não reconhecido.'); const validos = b.entries.map(normalizarRegistro).filter(Boolean); if (!validos.length || validos.length !== b.entries.length) throw Error('Há registros inválidos no arquivo.'); estado.backup = validos; $('#resumo-backup').textContent = `${validos.length} registro(s) válido(s). Mesclar mantém os atuais e evita IDs duplicados; substituir apaga os atuais.`; abrirModal($('#tela-restauracao')); } catch (e) { status(`Não foi possível restaurar: ${e.message}`, true); } }; leitor.onerror = () => status('Não foi possível ler o arquivo.', true); leitor.readAsText(arquivo);
 }
-function aplicarBackup(substituir) {
+async function aplicarBackup(substituir) {
   if (!estado.backup) return; if (substituir && !confirm('Isso substituirá todos os registros atuais. Deseja continuar?')) return;
-  const anteriores = estado.registros, novos = substituir ? estado.backup : [...new Map([...estado.registros, ...estado.backup].map(r => [r.id, r])).values()]; estado.registros = novos;
-  if (!persistir()) estado.registros = anteriores; else { fecharModal($('#tela-restauracao')); renderizar(); status(`Backup ${substituir ? 'restaurado, substituindo' : 'mesclado com'} os registros atuais.`); } estado.backup = null;
+  try {
+    await armazenamento.importar(estado.backup, substituir);
+    estado.registros = await armazenamento.buscarTodos();
+    fecharModal($('#tela-restauracao')); renderizar(); status(`Backup ${substituir ? 'restaurado, substituindo' : 'mesclado com'} os registros atuais.`); estado.backup = null;
+  } catch (erro) { informarFalha(erro); }
 }
 
 function imprimirRegistros(lista, titulo) {
@@ -133,5 +136,20 @@ $('#form-contato').addEventListener('submit',e=>{e.preventDefault();const name=$
 $('#aumentar-fonte').addEventListener('click',e=>{const ativo=document.body.classList.toggle('fonte-grande');e.currentTarget.setAttribute('aria-pressed',ativo);e.currentTarget.textContent=ativo?'Texto padrão':'Aumentar texto'});
 document.addEventListener('keydown',e=>{const modal=$$('.modal').find(m=>!m.hidden);if(!modal)return;if(e.key==='Escape'){modal=== $('#tela-respiracao')?pararRespiracao():fecharModal(modal)}else prenderFoco(e,modal)});
 
-const sentimentos=[...new Set($$('input[name="sentimento"]').map(x=>x.value))]; sentimentos.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;$('#filtro-sentimento').append(o)}); estado.registros=carregar(); renderizar();
+async function inicializarAplicacao() {
+  alternarControlesArmazenamento(false);
+  status('Preparando o armazenamento local…');
+  const resultado = await armazenamento.inicializar({ chaveAtual: CHAVE, chaveAntiga: CHAVE_ANTIGA, versaoBackup: VERSAO, normalizarRegistro });
+  estado.registros = resultado.registros;
+  estado.armazenamentoPronto = true;
+  alternarControlesArmazenamento(true);
+  renderizar();
+  if (resultado.modo === 'indexeddb') {
+    status(resultado.migracao.executada && resultado.migracao.quantidade > 0 ? `${resultado.migracao.quantidade} registro(s) preservado(s) no novo armazenamento local.` : 'Armazenamento local pronto.');
+  } else {
+    status('Não foi possível usar o novo armazenamento neste navegador. Seus dados antigos não foram apagados; o modo de segurança continua ativo. Recomendamos manter um backup.', true);
+  }
+}
+
+const sentimentos=[...new Set($$('input[name="sentimento"]').map(x=>x.value))]; sentimentos.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;$('#filtro-sentimento').append(o)}); inicializarAplicacao();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(e=>console.info('Modo offline indisponível.',e)));

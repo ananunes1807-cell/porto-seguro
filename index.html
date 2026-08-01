@@ -42,7 +42,7 @@
 
     <section id="diario" class="card" aria-labelledby="titulo-diario">
       <div class="cabecalho-secao"><div><p class="etiqueta">Salvo neste aparelho</p><h2 id="titulo-diario">Meu diário</h2><p>Escreva do seu jeito. Você não precisa organizar tudo agora.</p></div><span id="contador-registros" class="contador">0 registros</span></div>
-      <aside class="aviso"><strong>Privacidade local.</strong> O diário fica neste navegador, não é criptografado e pode ser visto por quem usa este perfil. Limpar os dados ou usar modo anônimo pode apagar os registros. Faça backups. <a href="privacidade.html">Entenda os limites</a>.</aside>
+      <aside class="aviso"><strong>Privacidade local.</strong> O diário fica no IndexedDB deste navegador e não é criptografado. Celular e computador ainda não sincronizam; cada endereço do site mantém dados separados. Limpar os dados ou usar modo anônimo pode apagar os registros. Faça backups. <a href="privacidade.html">Entenda os limites</a>.</aside>
       <p id="status-app" class="status" role="status" aria-live="polite"></p>
 
       <form id="form-diario" class="formulario">
@@ -81,6 +81,7 @@
   <div id="tela-restauracao" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-restauracao"><h2 id="titulo-restauracao">Como deseja restaurar?</h2><p id="resumo-backup"></p><div class="acoes"><button id="mesclar-backup" class="botao-primario" type="button">Mesclar sem duplicar</button><button id="substituir-backup" class="botao-perigo" type="button">Substituir registros atuais</button><button id="cancelar-backup" class="botao-secundario" type="button">Cancelar</button></div></section></div>
 
   <template id="modelo-registro"><article class="card-registro"><label class="selecionar"><input class="selecionar-registro" type="checkbox"> Incluir no relatório</label><div class="cabecalho-registro"><div><h3 class="registro-titulo"></h3><p class="registro-data"></p></div><span class="registro-intensidade"></span></div><p class="registro-sentimento"></p><p class="registro-texto"></p><div class="detalhes-registro"></div><p class="registro-edicao"></p><div class="acoes-registro"><button class="editar-registro" type="button">Editar</button><button class="imprimir-registro" type="button">Imprimir</button><button class="excluir-registro botao-perigo" type="button">Excluir</button></div></article></template>
+  <script src="storage.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
