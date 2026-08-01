@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <script>try{if(localStorage.getItem('portoSeguro.pin.v1'))document.documentElement.classList.add('pre-bloqueado')}catch{}</script>
 </head>
 <body>
   <a class="pular" href="#conteudo">Pular para o conteúdo</a>
@@ -26,6 +27,8 @@
       <div><p class="etiqueta">Um espaço no seu ritmo</p><h1>Porto Seguro</h1><p class="frase">Podemos te apoiar, mas, primeiramente, não se esqueça de você.</p>
       <div class="acoes-principais"><button id="abrir-apoio" class="botao-primario" type="button">Não estou bem ou não sei o que está acontecendo</button><a class="botao-secundario" href="#diario">Abrir meu diário</a></div></div>
     </section>
+
+    <section id="protecao-local" class="card" aria-labelledby="titulo-protecao"><p class="etiqueta">Privacidade opcional</p><h2 id="titulo-protecao">Proteção de acesso neste aparelho</h2><p>Crie um PIN para bloquear a visualização do aplicativo e escolha o tempo de inatividade. O PIN é uma barreira de acesso, não criptografa os dados.</p><form id="form-pin" class="formulario compacto"><div class="grade-dois"><div class="campo"><label for="novo-pin">Novo PIN com 4 a 8 números</label><input id="novo-pin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="8"></div><div class="campo"><label for="confirmar-pin">Confirmar PIN</label><input id="confirmar-pin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="8"></div></div><div class="campo"><label for="tempo-bloqueio">Bloquear após inatividade</label><select id="tempo-bloqueio"><option value="1">1 minuto</option><option value="5" selected>5 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option></select></div><p id="status-pin" class="status" role="status" aria-live="polite"></p><div class="acoes"><button class="botao-primario" type="submit">Ativar ou trocar PIN</button><button id="bloquear-agora" class="botao-secundario" type="button">Bloquear agora</button><button id="remover-pin" class="botao-perigo" type="button">Remover PIN</button></div></form><div class="aviso"><strong>Cópia antiga do diário.</strong> Depois que a migração for validada, você poderá remover a cópia legada do localStorage. Faça isso somente mantendo um backup recente.<div class="acoes"><button id="apagar-copia-antiga" class="botao-perigo" type="button">Apagar cópia antiga confirmada</button></div></div></section>
 
     <section id="apoio" class="card" aria-labelledby="titulo-apoio">
       <p class="etiqueta">Apoio</p><h2 id="titulo-apoio">Você não precisa explicar tudo agora.</h2><p>Escolha apenas o que parece possível neste momento.</p>
@@ -126,7 +129,7 @@
 
       <div class="ferramentas">
         <div class="grade-filtros"><div class="campo"><label for="pesquisa">Pesquisar</label><input id="pesquisa" type="search" placeholder="Palavra no título ou texto"></div><div class="campo"><label for="filtro-sentimento">Sentimento</label><select id="filtro-sentimento"><option value="">Todos</option></select></div><div class="campo"><label for="filtro-data">Data</label><input id="filtro-data" type="date"></div></div>
-        <div class="acoes"><button id="limpar-filtros" class="botao-secundario" type="button">Limpar filtros</button><button id="imprimir-diario" class="botao-secundario" type="button">Imprimir todos</button><button id="baixar-backup" class="botao-secundario" type="button">Baixar backup</button><button id="restaurar-backup" class="botao-secundario" type="button">Restaurar backup</button><input id="arquivo-backup" type="file" accept="application/json,.json" hidden></div>
+        <div class="acoes"><button id="limpar-filtros" class="botao-secundario" type="button">Limpar filtros</button><button id="imprimir-diario" class="botao-secundario" type="button">Imprimir todos</button><button id="baixar-backup" class="botao-secundario" type="button">Baixar backup</button><button id="restaurar-backup" class="botao-secundario" type="button">Restaurar backup</button><input id="arquivo-backup" type="file" accept="application/json,.json" hidden></div><p class="ajuda"><strong>Atenção:</strong> o backup JSON não possui senha nem criptografia. Guarde-o em um local protegido e não o compartilhe sem revisar seu conteúdo.</p>
       </div>
       <div id="lista-registros" class="lista-registros"></div><p id="sem-resultados" class="vazio">Nenhum registro encontrado.</p>
     </section>
@@ -138,6 +141,8 @@
 
     <section id="sobre" class="card"><p class="etiqueta">Sobre</p><h2>Uma ferramenta, não um atendimento</h2><p>O Porto Seguro ajuda a respirar, registrar e organizar experiências. Não diagnostica e não substitui terapia, atendimento médico ou emergência.</p></section>
   </main>
+
+  <div id="tela-bloqueio" class="modal bloqueio" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-bloqueio"><p class="etiqueta">Acesso protegido</p><h2 id="titulo-bloqueio">Porto Seguro bloqueado</h2><p>Digite o PIN deste aparelho. O bloqueio protege a tela, mas não criptografa o armazenamento.</p><form id="form-desbloqueio"><div class="campo"><label for="pin-desbloqueio">PIN</label><input id="pin-desbloqueio" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div><p id="status-desbloqueio" class="status" role="status" aria-live="polite"></p><button class="botao-primario" type="submit">Desbloquear</button></form><p class="ajuda">O PIN não pode ser recuperado. Limpar os dados do site remove o PIN, mas também pode apagar os dados locais.</p></section></div>
 
   <div id="tela-respiracao" class="modal" hidden><section class="modal-card respiracao" role="dialog" aria-modal="true" aria-labelledby="instrucao-respiracao"><p id="instrucao-respiracao" aria-live="assertive">Inspire devagar</p><strong id="numero-respiracao">4</strong><p id="ciclo-respiracao">Ciclo 1 de 5</p><p class="ajuda">Se sentir tontura ou desconforto, pare e respire normalmente.</p><div id="acoes-respiracao" class="acoes central"><button id="pausar-respiracao" class="botao-secundario" type="button">Pausar</button><button id="parar-respiracao" class="botao-secundario" type="button">Parar</button></div><div id="acoes-finais" hidden><button id="respirar-novamente" class="botao-primario" type="button">Respirar novamente</button><button id="registrar-apos-respirar" class="botao-secundario" type="button">Registrar como estou</button><button id="continuar-apoio" class="botao-secundario" type="button">Outras formas de apoio</button><button id="fechar-respiracao" class="botao-secundario" type="button">Fechar</button></div></section></div>
 

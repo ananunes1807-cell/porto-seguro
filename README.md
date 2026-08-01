@@ -23,6 +23,9 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - backup JSON versionado e restauração por mesclagem sem duplicatas ou substituição confirmada;
 - contato de confiança por WhatsApp com mensagem preparada, confirmação manual de envio e atalhos para CVV 188 e SAMU 192;
 - PWA instalável e funcional offline após o primeiro acesso.
+- bloqueio opcional por PIN derivado com PBKDF2, botão de bloqueio imediato e bloqueio por inatividade; o PIN não criptografa os dados;
+- telefone do contato mascarado, aviso explícito sobre backup sem criptografia e remoção confirmada da cópia legada após migração validada;
+- links diretos corrigidos após o carregamento assíncrono e sugestões de múltiplos sentimentos para confirmação da pessoa;
 
 ## Executar localmente
 
