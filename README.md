@@ -26,6 +26,8 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - bloqueio opcional por PIN derivado com PBKDF2, botão de bloqueio imediato e bloqueio por inatividade; o PIN não criptografa os dados;
 - telefone do contato mascarado, aviso explícito sobre backup sem criptografia e remoção confirmada da cópia legada após migração validada;
 - links diretos corrigidos após o carregamento assíncrono e sugestões de múltiplos sentimentos para confirmação da pessoa;
+- menu móvel compacto, navegação por áreas para reduzir a extensão da página e alvos de toque com pelo menos 44 px;
+- limpeza de cópias antigas restrita à área avançada, condicionada a migração validada e backup recente;
 
 ## Executar localmente
 

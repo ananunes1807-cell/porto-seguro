@@ -5,6 +5,7 @@ const armazenamento = window.PortoSeguroStorage;
 const estado = { registros: [], planoSeguranca: null, caixaAcolhimento: null, perfil: null, feedbackApoio: [], relatorioAtual: null, backup: null, armazenamentoPronto: false, audioPendente: null, audioUrl: null, gravador: null, respiracao: { ativa: false, pausada: false, ciclo: 0, fase: 'inspirar', restante: 4, timer: null }, ultimoFoco: null };
 const CAMPOS_PLANO = ['sinais', 'gatilhos', 'ajuda', 'piora', 'lugares', 'contatos', 'profissionais', 'passos'];
 let timerBloqueio;
+const CHAVE_BACKUP_RECENTE='portoSeguro.backupRecente.v1';
 
 function idSeguro() { return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function dataValida(valor) { return typeof valor === 'string' && !Number.isNaN(Date.parse(valor)); }
@@ -23,6 +24,8 @@ function informarFalha(erro) { console.error('Operação de armazenamento não c
 function formatarData(valor) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(valor)); }
 function gerarTitulo(texto, data = new Date().toISOString()) { const inicio = String(texto).trim().replace(/\s+/g, ' ').split(' ').slice(0, 7).join(' '); return inicio ? `${inicio}${String(texto).trim().split(/\s+/).length > 7 ? '…' : ''}` : `Registro de ${new Intl.DateTimeFormat('pt-BR').format(new Date(data))}`; }
 function sentimentoSelecionado() { return $('input[name="sentimento"]:checked')?.value || 'Ainda não sei dizer'; }
+function ativarSecao(){const id=decodeURIComponent(location.hash.slice(1))||'inicio',alvo=document.getElementById(id),secao=alvo?.closest('main>section')||$('#inicio');$$('main>section').forEach(s=>s.classList.toggle('secao-ativa',s===secao||(secao.id==='inicio'&&s.id==='apoio')));document.body.classList.add('navegacao-secoes');$('#menu-principal').classList.remove('aberto');$('#alternar-menu').setAttribute('aria-expanded','false')}
+function prepararLimpezaAvancada(){const aviso=$('#protecao-local>.aviso');if(!aviso||aviso.closest('details'))return;const detalhes=document.createElement('details'),resumo=document.createElement('summary');detalhes.id='limpeza-avancada';detalhes.className='aviso';resumo.textContent='Opções avançadas de armazenamento';aviso.before(detalhes);detalhes.append(resumo,...aviso.childNodes);aviso.remove()}
 function configuracaoPin(){try{return JSON.parse(localStorage.getItem(CHAVE_PIN)||'null')}catch{return null}}
 function bytesBase64(bytes){return btoa(String.fromCharCode(...bytes))}
 async function derivarPin(pin,salBase64){const sal=Uint8Array.from(atob(salBase64),c=>c.charCodeAt(0)),chave=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:sal,iterations:150000,hash:'SHA-256'},chave,256);return bytesBase64(new Uint8Array(bits))}
@@ -31,7 +34,7 @@ function reiniciarInatividade(){const c=configuracaoPin();clearTimeout(timerBloq
 async function configurarPin(evento){evento.preventDefault();const pin=$('#novo-pin').value,confirmacao=$('#confirmar-pin').value;if(!/^\d{4,8}$/.test(pin)||pin!==confirmacao)return $('#status-pin').textContent='Use de 4 a 8 números iguais nos dois campos.';try{const sal=crypto.getRandomValues(new Uint8Array(16)),salBase64=bytesBase64(sal),config={salt:salBase64,hash:await derivarPin(pin,salBase64),minutes:Number($('#tempo-bloqueio').value),createdAt:new Date().toISOString()};localStorage.setItem(CHAVE_PIN,JSON.stringify(config));$('#novo-pin').value='';$('#confirmar-pin').value='';$('#status-pin').textContent='PIN ativado. Bloqueando agora…';setTimeout(bloquearAgora,300)}catch(erro){console.error('PIN não configurado:',erro?.name||'Erro');$('#status-pin').textContent='Não foi possível ativar o PIN neste navegador.'}}
 async function desbloquear(evento){evento.preventDefault();const c=configuracaoPin();if(!c)return;const hash=await derivarPin($('#pin-desbloqueio').value,c.salt);if(hash!==c.hash)return $('#status-desbloqueio').textContent='PIN incorreto.';$('#tela-bloqueio').hidden=true;document.body.classList.remove('bloqueado','sem-rolagem');document.documentElement.classList.remove('pre-bloqueado');reiniciarInatividade();$('#inicio').focus?.()}
 function removerPin(){if(!configuracaoPin())return $('#status-pin').textContent='Nenhum PIN está configurado.';if(!confirm('Remover a proteção por PIN deste aparelho? Os dados continuarão sem criptografia.'))return;localStorage.removeItem(CHAVE_PIN);clearTimeout(timerBloqueio);$('#status-pin').textContent='Proteção por PIN removida.'}
-async function apagarCopiaAntiga(){const migracao=await armazenamento.buscarMetadado('migracaoLocalStorageV1');if(!migracao?.completedAt)return $('#status-pin').textContent='A migração ainda não foi validada; a cópia antiga foi preservada.';if(!confirm('Confirma que possui backup recente e deseja apagar as cópias antigas do diário no localStorage?'))return;localStorage.removeItem(CHAVE);localStorage.removeItem(CHAVE_ANTIGA);$('#status-pin').textContent='Cópias antigas removidas. O diário atual no IndexedDB foi preservado.'}
+async function apagarCopiaAntiga(){const migracao=await armazenamento.buscarMetadado('migracaoLocalStorageV1'),backup=Date.parse(localStorage.getItem(CHAVE_BACKUP_RECENTE)||'');if(!migracao?.completedAt)return $('#status-pin').textContent='A migração ainda não foi validada; a cópia antiga foi preservada.';if(!Number.isFinite(backup)||Date.now()-backup>30*86400000)return $('#status-pin').textContent='Baixe primeiro um backup JSON recente. Nenhuma cópia foi removida.';if(!confirm('Você confirma que baixou e guardou um backup recente e deseja remover somente as cópias antigas?'))return;localStorage.removeItem(CHAVE);localStorage.removeItem(CHAVE_ANTIGA);$('#limpeza-avancada').hidden=true;$('#status-pin').textContent='Cópias antigas removidas. O diário atual no IndexedDB foi preservado.'}
 
 function normalizarPlano(item) {
   if (!item || typeof item !== 'object') return null;
@@ -148,7 +151,7 @@ function renderizar() {
     $('.registro-titulo', frag).textContent = r.title; $('.registro-data', frag).textContent = `Criado em ${formatarData(r.createdAt)}`; $('.registro-intensidade', frag).textContent = r.intensity === null ? 'Intensidade: não sei' : `Intensidade: ${r.intensity}/10`; $('.registro-sentimento', frag).textContent = `Sentimento: ${r.feeling}`; $('.registro-texto', frag).textContent = r.text; $('.selecionar-registro', frag).value = r.id;
     const detalhes = $('.detalhes-registro', frag); if (r.helped) { const p = document.createElement('p'); p.textContent = `O que ajudou: ${r.helped}`; detalhes.append(p); } if (r.worsened) { const p = document.createElement('p'); p.textContent = `O que piorou: ${r.worsened}`; detalhes.append(p); }
     if (r.postCrisis) { const p = document.createElement('p'); p.textContent = 'Tipo: registro pós-crise'; detalhes.prepend(p); $('.editar-registro', frag).remove(); }
-    const ed = $('.registro-edicao', frag); if (r.updatedAt) ed.textContent = `Editado em ${formatarData(r.updatedAt)} · ${r.history.length} versão(ões) anterior(es)`; else ed.remove();
+    const ed = $('.registro-edicao', frag); if (r.updatedAt) ed.textContent = `Editado em ${formatarData(r.updatedAt)} · ${r.history.length} ${r.history.length===1?'versão anterior':'versões anteriores'}`; else ed.remove();
     lista.append(frag); carregarAudioRegistro(r.id, card);
   });
 }
@@ -165,7 +168,7 @@ async function baixarBackup() {
     const planoSeguranca = await armazenamento.buscarPlanoSeguranca();
     const caixa = await armazenamento.buscarCaixaAcolhimento(), comfortBox = caixa ? { mensagem:caixa.mensagem, funciona:caixa.funciona, lembranca:caixa.lembranca, exercicio:caixa.exercicio, updatedAt:caixa.updatedAt } : null;
     if (!registros.length && !planoSeguranca && !caixa) return alert('Ainda não há dados para o backup.');
-    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 3, createdAt: new Date().toISOString(), entries: registros, safetyPlan: planoSeguranca, comfortBox }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); status('Backup baixado. Fotos e áudios permanecem somente neste aparelho.');
+    const blob = new Blob([JSON.stringify({ app: 'Porto Seguro', version: VERSAO, schemaVersion: 3, createdAt: new Date().toISOString(), entries: registros, safetyPlan: planoSeguranca, comfortBox }, null, 2)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `porto-seguro-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 0); localStorage.setItem(CHAVE_BACKUP_RECENTE,new Date().toISOString()); status('Backup baixado. Fotos e áudios permanecem somente neste aparelho.');
   } catch (erro) { informarFalha(erro); }
 }
 function lerBackup(evento) {
@@ -268,6 +271,7 @@ $('#form-caixa').addEventListener('submit',salvarCaixa);$('#apagar-caixa').addEv
 $('#form-perfil').addEventListener('submit',salvarPerfil);$('#form-perfil').addEventListener('input',agendarPerfil);$('#form-perfil').addEventListener('change',agendarPerfil);$('#redefinir-perfil').addEventListener('click',redefinirPerfil);$('#nova-frase').addEventListener('click',mostrarFrase);$$('.avaliar-frase').forEach(b=>b.addEventListener('click',()=>avaliarFrase(b.dataset.avaliacao)));
 $('#form-pin').addEventListener('submit',configurarPin);$('#form-desbloqueio').addEventListener('submit',desbloquear);$('#bloquear-agora').addEventListener('click',bloquearAgora);$('#remover-pin').addEventListener('click',removerPin);$('#apagar-copia-antiga').addEventListener('click',apagarCopiaAntiga);['pointerdown','keydown','touchstart'].forEach(nome=>document.addEventListener(nome,reiniciarInatividade,{passive:true}));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&configuracaoPin())bloquearAgora()});
+$('#alternar-menu').addEventListener('click',()=>{const aberto=$('#menu-principal').classList.toggle('aberto');$('#alternar-menu').setAttribute('aria-expanded',String(aberto))});$('#menu-principal').addEventListener('click',e=>{if(e.target.closest('a')){$('#menu-principal').classList.remove('aberto');$('#alternar-menu').setAttribute('aria-expanded','false')}});addEventListener('hashchange',ativarSecao);prepararLimpezaAvancada();ativarSecao();
 
 async function inicializarAplicacao() {
   const hashInicial=location.hash;
@@ -275,6 +279,7 @@ async function inicializarAplicacao() {
   alternarControlesArmazenamento(false);
   status('Preparando o armazenamento local…');
   const resultado = await armazenamento.inicializar({ chaveAtual: CHAVE, chaveAntiga: CHAVE_ANTIGA, versaoBackup: VERSAO, normalizarRegistro });
+  $('#limpeza-avancada').hidden=!localStorage.getItem(CHAVE)&&!localStorage.getItem(CHAVE_ANTIGA);
   estado.registros = resultado.registros;
   try { estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca); } catch (erro) { console.error('Plano pessoal indisponível:', erro?.name || 'Erro'); $('#status-plano').textContent = 'O plano pessoal não está disponível neste navegador.'; }
   try { estado.caixaAcolhimento = await armazenamento.buscarCaixaAcolhimento(); preencherCaixa(estado.caixaAcolhimento); } catch (erro) { console.error('Caixa indisponível:', erro?.name || 'Erro'); $('#status-caixa').textContent = 'A caixa de acolhimento não está disponível neste navegador.'; }
