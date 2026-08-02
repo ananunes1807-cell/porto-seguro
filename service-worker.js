@@ -1,4 +1,4 @@
-const CACHE_NAME = 'porto-seguro-v13';
+const CACHE_NAME = 'porto-seguro-v14';
 const ARQUIVOS = [
     './',
     './index.html',
@@ -21,7 +21,7 @@ self.addEventListener('activate', (evento) => {
     evento.waitUntil(
         caches.keys().then((nomes) => Promise.all(
             nomes
-                .filter((nome) => nome !== CACHE_NAME)
+                .filter((nome) => nome.startsWith('porto-seguro-') && nome !== CACHE_NAME)
                 .map((nome) => caches.delete(nome))
         ))
     );
