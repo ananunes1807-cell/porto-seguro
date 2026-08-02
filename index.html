@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#6f5bd3">
+  <meta name="theme-color" content="#fff8fb">
   <meta name="description" content="Porto Seguro: acolhimento, respiração guiada e diário emocional local.">
   <title>Porto Seguro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
-  <script>try{if(localStorage.getItem('portoSeguro.pin.v1'))document.documentElement.classList.add('pre-bloqueado')}catch{}</script>
+  <script>try{const t=localStorage.getItem('portoSeguro.tema.v1')||((matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.dataset.theme=t;if(localStorage.getItem('portoSeguro.pin.v1'))document.documentElement.classList.add('pre-bloqueado')}catch{}</script>
 </head>
 <body>
   <a class="pular" href="#conteudo">Pular para o conteúdo</a>
@@ -20,12 +20,13 @@
       <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#perfil-acolhimento">Meu perfil</a><a href="#plano-seguranca">Meu plano</a><a href="#pos-crise">Pós-crise</a><a href="#caixa-acolhimento">Minha caixa</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="#protecao-local">Proteção</a><a href="privacidade.html">Privacidade</a>
     </nav>
     <button id="aumentar-fonte" class="botao-discreto" type="button" aria-pressed="false">Aumentar texto</button>
+    <button id="theme-toggle" class="botao-discreto tema-botao" type="button" aria-label="Ativar modo escuro"><span aria-hidden="true">🌙</span></button>
   </header>
 
   <main id="conteudo" class="container">
     <section id="inicio" class="hero card">
       <span class="marca-icone" aria-hidden="true">♡</span>
-      <div><p class="etiqueta">Um espaço no seu ritmo</p><h1>Porto Seguro</h1><p class="frase">Podemos te apoiar, mas, primeiramente, não se esqueça de você.</p>
+      <div class="titulo-decorado"><span class="sparkle sparkle-um" aria-hidden="true"></span><span class="sparkle sparkle-dois" aria-hidden="true"></span><span class="sparkle sparkle-tres" aria-hidden="true"></span><p class="etiqueta">Um espaço no seu ritmo</p><h1>Porto Seguro</h1><p class="frase">Podemos te apoiar, mas, primeiramente, não se esqueça de você.</p>
       <div class="acoes-principais"><button id="abrir-apoio" class="botao-primario" type="button">Não estou bem ou não sei o que está acontecendo</button><a class="botao-secundario" href="#diario">Abrir meu diário</a></div></div>
     </section>
 

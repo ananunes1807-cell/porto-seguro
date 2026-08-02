@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#6f5bd3">
+  <meta name="theme-color" content="#fff8fb">
   <title>Privacidade — Porto Seguro</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('portoSeguro.tema.v1')||((matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light')}catch{}</script>
 </head>
 <body>
-  <header class="topo"><a class="logo" href="index.html"><span aria-hidden="true">♡</span> Porto Seguro</a><nav aria-label="Navegação"><a href="index.html">Voltar ao aplicativo</a></nav></header>
+  <header class="topo"><a class="logo" href="index.html"><span aria-hidden="true">♡</span> Porto Seguro</a><nav aria-label="Navegação"><a href="index.html">Voltar ao aplicativo</a></nav><button id="theme-toggle" class="botao-discreto tema-botao" type="button" aria-label="Ativar modo escuro"><span aria-hidden="true">🌙</span></button></header>
   <main class="container"><article class="card">
     <p class="etiqueta">Privacidade e limites</p><h1>Seus dados ficam neste navegador</h1>
     <p>O Porto Seguro não possui conta, servidor de diário, analytics, publicidade ou rastreadores. Os registros do diário, áudios e a caixa de acolhimento ficam no IndexedDB; o contato de confiança continua no armazenamento local do navegador.</p>
@@ -22,5 +23,6 @@
     <h2>Limites de apoio</h2><p>O Porto Seguro não faz diagnóstico, não substitui terapia ou atendimento médico e não é serviço de emergência. Nenhuma ligação ou mensagem é enviada automaticamente, nenhuma localização é compartilhada e ninguém é avisado sem uma ação sua.</p>
     <a class="botao-primario" href="index.html">Voltar ao Porto Seguro</a>
   </article></main>
+  <script>const botaoTema=document.querySelector('#theme-toggle');function atualizarTema(){const escuro=document.documentElement.dataset.theme==='dark';botaoTema.setAttribute('aria-label',escuro?'Ativar modo claro':'Ativar modo escuro');botaoTema.querySelector('span').textContent=escuro?'☀️':'🌙';document.querySelector('meta[name="theme-color"]').content=escuro?'#201b2c':'#fff8fb'}botaoTema.addEventListener('click',()=>{const tema=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=tema;try{localStorage.setItem('portoSeguro.tema.v1',tema)}catch{}atualizarTema()});atualizarTema()</script>
 </body>
 </html>
