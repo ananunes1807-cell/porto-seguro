@@ -3,7 +3,7 @@
 // Camada única de persistência do diário. A interface nunca acessa IndexedDB diretamente.
 window.PortoSeguroStorage = (() => {
   const NOME_BANCO = 'portoSeguroDB';
-  const VERSAO_BANCO = 4;
+  const VERSAO_BANCO = 5;
   const STORE_REGISTROS = 'registros';
   const STORE_METADADOS = 'metadados';
   const STORE_PLANOS = 'planosSeguranca';
@@ -45,6 +45,7 @@ window.PortoSeguroStorage = (() => {
         if (!registros.indexNames.contains('porCriacao')) registros.createIndex('porCriacao', 'createdAt');
         if (!registros.indexNames.contains('porAtualizacao')) registros.createIndex('porAtualizacao', 'updatedAt');
         if (!registros.indexNames.contains('porSentimento')) registros.createIndex('porSentimento', 'feeling');
+        if (!registros.indexNames.contains('porSentimentos')) registros.createIndex('porSentimentos', 'feelings', { multiEntry: true });
         if (!db.objectStoreNames.contains(STORE_METADADOS)) db.createObjectStore(STORE_METADADOS, { keyPath: 'key' });
         if (!db.objectStoreNames.contains(STORE_PLANOS)) db.createObjectStore(STORE_PLANOS, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(STORE_ACOLHIMENTO)) db.createObjectStore(STORE_ACOLHIMENTO, { keyPath: 'id' });
@@ -101,7 +102,7 @@ window.PortoSeguroStorage = (() => {
   async function buscarTodosIndexedDB() {
     const tx = banco.transaction(STORE_REGISTROS, 'readonly');
     const lista = await requisicao(tx.objectStore(STORE_REGISTROS).getAll());
-    return lista.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    return lista.map(configuracao.normalizarRegistro).filter(Boolean).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   }
 
   function salvarFallback(lista) {
