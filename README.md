@@ -23,8 +23,9 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - backup JSON versionado e restauração por mesclagem sem duplicatas ou substituição confirmada;
 - contato de confiança por WhatsApp com mensagem preparada, confirmação manual de envio e atalhos para CVV 188 e SAMU 192;
 - PWA instalável e funcional offline após o primeiro acesso.
-- bloqueio opcional por PIN derivado com PBKDF2, botão de bloqueio imediato e bloqueio por inatividade; o PIN não criptografa os dados;
+- bloqueio opcional por PIN derivado com PBKDF2 (600 mil iterações) e cooldown progressivo após tentativas incorretas; com um PIN ativo, o diário, o plano de segurança, a caixa de acolhimento e o perfil passam a ser cifrados (AES-256-GCM) neste aparelho;
 - telefone do contato mascarado, aviso explícito sobre backup sem criptografia e remoção confirmada da cópia legada após migração validada;
+- sincronização opcional entre aparelhos por conta (e-mail/senha ou Google), com uma chave de sincronização própria que cifra os dados antes de qualquer envio ao Firestore — veja "Sincronização entre aparelhos" abaixo;
 - links diretos corrigidos após o carregamento assíncrono e sugestões de múltiplos sentimentos para confirmação da pessoa;
 - menu móvel compacto, navegação por áreas para reduzir a extensão da página e alvos de toque com pelo menos 44 px;
 - limpeza de cópias antigas restrita à área avançada, condicionada a migração validada e backup recente;
@@ -43,9 +44,23 @@ Abra `http://localhost:8000`. O servidor é necessário para testar o service wo
 
 Os registros usam o banco local `IndexedDB` (`portoSeguroDB`) e não são enviados pelo aplicativo para GitHub, Firebase ou outro serviço. Na primeira abertura, registros das chaves legadas `portoSeguro.diario.v2` ou `portoSeguro.diario.v1` são copiados e conferidos sem apagar a cópia antiga. O contato de confiança permanece em `localStorage` por ser uma configuração deste aparelho.
 
-O armazenamento não é criptografado. Celular e computador ainda não sincronizam; além disso, localhost, Firebase e GitHub Pages mantêm dados separados. Limpar os dados do navegador pode apagar o diário. O modo anônimo não é adequado. Use **Baixar backup** regularmente e guarde o JSON onde preferir. Veja `privacidade.html`.
+Sem um PIN configurado, o armazenamento fica em texto simples; com um PIN ativo, passa a ser cifrado neste aparelho. Sem ativar a sincronização (opcional, por conta), celular e computador não compartilham dados; além disso, localhost, Firebase e GitHub Pages mantêm dados locais separados. Limpar os dados do navegador pode apagar o diário. O modo anônimo não é adequado. Use **Baixar backup** regularmente e guarde o JSON onde preferir. Veja `privacidade.html`.
 
-O Porto Seguro não diagnostica, não substitui terapia, atendimento médico ou serviço de emergência. Não há analytics, cookies publicitários ou coleta de informações.
+O Porto Seguro não diagnostica, não substitui terapia, atendimento médico ou serviço de emergência. Não há analytics, cookies publicitários ou coleta de informações fora da sincronização opcional que você mesma(o) ativa.
+
+## Sincronização entre aparelhos (opcional)
+
+Além do modo somente local (padrão), é possível criar uma conta (e-mail/senha ou Google) para acessar o mesmo diário, plano de segurança e relatórios em outro aparelho. Antes de qualquer envio, os dados são cifrados neste aparelho com uma **chave de sincronização** própria — um segredo separado da senha de login, pedido uma vez por conta e depois em cada novo aparelho. O Firestore nunca recebe texto simples, só o envelope cifrado. Fotos e áudios não sincronizam nesta versão (mesmo limite já existente no backup JSON local).
+
+Para rodar esse recurso localmente (contribuindo com o projeto):
+
+1. Instale a CLI do Firebase (`npm install -g firebase-tools`) e faça login (`firebase login`).
+2. Em `sync.js`, substitua os valores de `CONFIGURACAO_FIREBASE` pelos do seu app Web (Console do Firebase → Configurações do projeto → Seus apps → Web). Os valores padrão só funcionam contra o emulador local.
+3. Ative **Authentication** (métodos e-mail/senha e Google) e **Firestore** (região `southamerica-east1`, ou a de sua preferência) no [console do Firebase](https://console.firebase.google.com) para o projeto configurado em `.firebaserc`.
+4. Para testar sem tocar em dados reais, use os emuladores: `firebase emulators:start --only auth,firestore`. Com o app aberto em `localhost`, `sync.js` se conecta neles automaticamente.
+5. Para publicar as regras de segurança no projeto real: `firebase deploy --only firestore:rules`.
+
+Veja `privacidade.html`, seção "Limites da sincronização", para os avisos completos sobre esse recurso — incluindo que a chave de sincronização não pode ser recuperada.
 
 ## Publicar no GitHub Pages
 
@@ -57,9 +72,10 @@ O Porto Seguro não diagnostica, não substitui terapia, atendimento médico ou 
 
 ## Limitações atuais e próximos recursos
 
-- os dados não sincronizam entre aparelhos ou origens diferentes;
+- a sincronização entre aparelhos é opcional, só cobre texto (sem fotos/áudio) e depende de gatilhos automáticos (desbloqueio e reconexão), não é em tempo real;
 - limites e disponibilidade do `IndexedDB` variam por navegador;
 - o ícone atual é SVG; alguns dispositivos antigos podem exigir ícones PNG de 192 e 512 px;
-- fotos e áudios ficam apenas no navegador e não são incluídos no backup JSON;
+- fotos e áudios ficam apenas no navegador e não são incluídos no backup JSON nem na sincronização;
+- sincronizar fotos/áudios exigiria Firebase Storage e o plano pago (Blaze) do projeto — não incluído nesta etapa;
 - IA online exigiria consentimento, política de privacidade e backend seguro; nenhuma chave de API existe neste projeto.
 - a organização atual dos relatórios é inteiramente local; a arquitetura futura de IA não está exposta na interface e nenhum dado é transmitido.

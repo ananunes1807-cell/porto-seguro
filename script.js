@@ -319,6 +319,85 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&configurac
 addEventListener('pageshow',evento=>{if(evento.persisted&&configuracaoPin())bloquearAgora()});
 $('#alternar-menu').addEventListener('click',()=>{const aberto=$('#menu-principal').classList.toggle('aberto');$('#alternar-menu').setAttribute('aria-expanded',String(aberto))});$('#menu-principal').addEventListener('click',e=>{if(e.target.closest('a'))fecharMenu()});document.addEventListener('pointerdown',e=>{if($('#menu-principal').classList.contains('aberto')&&!e.target.closest('#menu-principal')&&!e.target.closest('#alternar-menu'))fecharMenu()});$('#sentimentos').addEventListener('change',e=>{if(!e.target.matches('input[name="sentimento"]'))return;const incerto=$('input[name="sentimento"][value="Ainda não sei dizer"]');if(e.target===incerto&&incerto.checked)$$('input[name="sentimento"]').forEach(x=>{if(x!==incerto)x.checked=false});else if(e.target.checked)incerto.checked=false;if(!$$('input[name="sentimento"]:checked').length)incerto.checked=true});addEventListener('hashchange',ativarSecao);prepararLimpezaAvancada();prepararSOS();prepararStatusUrgente();prepararSelecaoRelatorio();$('#config-sos').addEventListener('change',salvarPreferenciasSOS);$('#lista-registros').addEventListener('change',e=>{if(e.target.matches('.selecionar-registro'))alternarSelecaoRelatorio(e.target.value,e.target.checked)});$('#abrir-sos').addEventListener('click',abrirSOS);$('#voltar-pin').addEventListener('click',voltarAoPin);$('#sos-contato').addEventListener('click',ligarContatoSOS);$('#sos-whatsapp').addEventListener('click',whatsappSOS);$('#sos-respirar').addEventListener('click',()=>{$('#tela-sos').hidden=true;iniciarRespiracao()});const SR=window.SpeechRecognition||window.webkitSpeechRecognition;$('#suporte-transcricao').textContent=SR?'A transcrição só começa se a opção acima estiver marcada.':'A transcrição automática não está disponível neste navegador. Você ainda pode gravar e manter o áudio.';ativarSecao();
 
+// --- Sincronização opcional entre aparelhos (Firebase) ---------------------
+const CHAVE_MODO_CONTA = 'portoSeguro.modoConta.v1';
+function modoConta() { try { return localStorage.getItem(CHAVE_MODO_CONTA); } catch { return null; } }
+function definirModoConta(modo) { try { localStorage.setItem(CHAVE_MODO_CONTA, modo); } catch {} }
+function sincronizacao() { const s = window.PortoSeguroSync; if (s) s.inicializar(armazenamento); return s; }
+
+function mostrarSeletorModoConta() { if (modoConta() || bloqueioAtivo) return; abrirModal($('#tela-modo-conta')); }
+
+let sincronizacaoNovamenteSolicitada = false;
+async function tentarSincronizarAutomaticamente() {
+  const s = sincronizacao();
+  if (!s || !s.usuarioAtual() || !s.temChaveSincronizacao()) return;
+  // Uma sincronização já está rodando: marca para rodar mais uma vez assim que
+  // ela terminar, em vez de sobrepor (a trava de reentrância) ou ignorar em
+  // silêncio a mudança que acabou de acontecer.
+  if (s.status().emAndamento) { sincronizacaoNovamenteSolicitada = true; return; }
+  do {
+    sincronizacaoNovamenteSolicitada = false;
+    const resultado = await s.sincronizarAgora();
+    if (estado.armazenamentoPronto) await recarregarEstadoDoArmazenamento();
+    if (resultado?.ok) $('#status-sync-ultima').textContent = `Última sincronização: ${formatarData(resultado.quando)}.`;
+    else if (resultado?.erro) $('#status-sync-ultima').textContent = `Sincronização parcial: ${resultado.erro}`;
+  } while (sincronizacaoNovamenteSolicitada);
+}
+
+function atualizarPainelSync() {
+  const s = sincronizacao();
+  const logado = Boolean(s?.usuarioAtual());
+  $('#sync-deslogado').hidden = logado;
+  $('#sync-logado').hidden = !logado;
+  if (!logado) return;
+  $('#status-sync-sessao').textContent = `Conectado como ${s.usuarioAtual().email || 'conta Google'}.`;
+  const temChave = s.temChaveSincronizacao();
+  $('#sync-pronto').hidden = !temChave;
+  if (temChave) { $('#sync-precisa-chave').hidden = true; $('#sync-configurar-chave').hidden = true; return; }
+  s.existeChaveSincronizacaoConfigurada().then(existe => { $('#sync-precisa-chave').hidden = !existe; $('#sync-configurar-chave').hidden = existe; });
+}
+
+$('#form-sync-entrar').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const s = sincronizacao(); if (!s) return $('#status-sync-conta').textContent = 'Sincronização indisponível neste navegador.';
+  const email = $('#sync-email').value.trim(), senha = $('#sync-senha').value;
+  if (!email || !senha) return $('#status-sync-conta').textContent = 'Informe e-mail e senha.';
+  try { await s.entrarComEmailSenha(email, senha); $('#status-sync-conta').textContent = ''; $('#sync-senha').value = ''; atualizarPainelSync(); }
+  catch (erro) { console.error('Login não realizado:', erro?.code || erro?.name || 'Erro'); $('#status-sync-conta').textContent = 'Não foi possível entrar. Confira o e-mail e a senha.'; }
+});
+$('#sync-criar-conta').addEventListener('click', async () => {
+  const s = sincronizacao(); if (!s) return $('#status-sync-conta').textContent = 'Sincronização indisponível neste navegador.';
+  const email = $('#sync-email').value.trim(), senha = $('#sync-senha').value;
+  if (!email || senha.length < 6) return $('#status-sync-conta').textContent = 'Informe um e-mail e uma senha com pelo menos 6 caracteres.';
+  try { await s.criarContaComEmailSenha(email, senha); $('#status-sync-conta').textContent = ''; $('#sync-senha').value = ''; atualizarPainelSync(); }
+  catch (erro) { console.error('Conta não criada:', erro?.code || erro?.name || 'Erro'); $('#status-sync-conta').textContent = 'Não foi possível criar a conta. O e-mail já pode estar em uso, ou a senha é fraca demais.'; }
+});
+$('#sync-google').addEventListener('click', async () => {
+  const s = sincronizacao(); if (!s) return $('#status-sync-conta').textContent = 'Sincronização indisponível neste navegador.';
+  try { await s.entrarComGoogle(); $('#status-sync-conta').textContent = ''; atualizarPainelSync(); }
+  catch (erro) { console.error('Login com Google não realizado:', erro?.code || erro?.name || 'Erro'); $('#status-sync-conta').textContent = 'Não foi possível entrar com o Google.'; }
+});
+$('#form-sync-chave').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const s = sincronizacao(), frase = $('#sync-chave-frase').value;
+  if (!frase) return $('#status-sync-chave').textContent = 'Digite a chave de sincronização.';
+  try { await s.desbloquearChaveSincronizacao(frase); $('#sync-chave-frase').value = ''; $('#status-sync-chave').textContent = ''; atualizarPainelSync(); await tentarSincronizarAutomaticamente(); }
+  catch (erro) { $('#status-sync-chave').textContent = erro?.message || 'Não foi possível desbloquear a sincronização.'; }
+});
+$('#form-sync-nova-chave').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const s = sincronizacao(), chave = $('#sync-nova-chave').value, confirmacao = $('#sync-confirmar-chave').value;
+  if (chave.length < 8 || chave !== confirmacao) return $('#status-sync-nova-chave').textContent = 'Use ao menos 8 caracteres e confirme a mesma chave nos dois campos.';
+  try { await s.configurarChaveSincronizacaoPelaPrimeiraVez(chave); $('#sync-nova-chave').value = ''; $('#sync-confirmar-chave').value = ''; $('#status-sync-nova-chave').textContent = ''; atualizarPainelSync(); await tentarSincronizarAutomaticamente(); }
+  catch (erro) { console.error('Chave de sincronização não configurada:', erro?.name || 'Erro'); $('#status-sync-nova-chave').textContent = 'Não foi possível criar a chave de sincronização agora.'; }
+});
+$('#sync-agora').addEventListener('click', async () => { $('#status-sync-ultima').textContent = 'Sincronizando…'; await tentarSincronizarAutomaticamente(); });
+$('#sync-sair').addEventListener('click', async () => { await sincronizacao()?.sair(); atualizarPainelSync(); });
+$('#modo-somente-local').addEventListener('click', () => { definirModoConta('local'); fecharModal($('#tela-modo-conta')); });
+$('#modo-sincronizado').addEventListener('click', () => { definirModoConta('sincronizado'); fecharModal($('#tela-modo-conta')); location.hash = 'sincronizacao'; ativarSecao(); });
+addEventListener('online', tentarSincronizarAutomaticamente);
+addEventListener('load', () => { const s = sincronizacao(); s?.aoMudarSessao(() => { atualizarPainelSync(); tentarSincronizarAutomaticamente(); }); });
+
 // Só abre o IndexedDB e roda a migração legada do localStorage (uma vez por sessão).
 // Precisa concluir ANTES de qualquer operação de criptografia, que depende do banco aberto.
 async function garantirBanco() {
@@ -329,26 +408,36 @@ async function garantirBanco() {
   estado.migracaoInicial = resultado.migracao;
 }
 
+// Recarrega o estado em memória e a interface a partir do armazenamento local.
+// Usado tanto no carregamento inicial quanto depois de uma sincronização bem-sucedida,
+// já que sincronizarAgora() grava direto no IndexedDB sem passar pelo estado do script.js.
+async function recarregarEstadoDoArmazenamento() {
+  estado.registros = await armazenamento.buscarTodos();
+  estado.selecionadosRelatorio = new Set(estado.registros.map(r => r.id));
+  try { estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca); } catch (erro) { console.error('Plano pessoal indisponível:', erro?.name || 'Erro'); }
+  try { estado.caixaAcolhimento = await armazenamento.buscarCaixaAcolhimento(); preencherCaixa(estado.caixaAcolhimento); } catch (erro) { console.error('Caixa indisponível:', erro?.name || 'Erro'); }
+  try { estado.perfil = await armazenamento.buscarPerfilAcolhimento(); estado.feedbackApoio = await armazenamento.buscarFeedbackApoio(); preencherPerfil(estado.perfil); } catch (erro) { console.error('Perfil indisponível:', erro?.name || 'Erro'); }
+  renderizar();
+}
+
 async function carregarDados(hashInicial) {
   alternarControlesArmazenamento(false);
   status('Preparando o armazenamento local…');
   await garantirBanco();
-  const resultado = { registros: await armazenamento.buscarTodos(), modo: estado.modoArmazenamento, migracao: estado.migracaoInicial };
+  const resultado = { modo: estado.modoArmazenamento, migracao: estado.migracaoInicial };
   $('#limpeza-avancada').hidden=!localStorage.getItem(CHAVE)&&!localStorage.getItem(CHAVE_ANTIGA);
-  estado.registros = resultado.registros;
-  estado.selecionadosRelatorio = new Set(estado.registros.map(r=>r.id));
-  try { estado.planoSeguranca = await armazenamento.buscarPlanoSeguranca(); preencherPlano(estado.planoSeguranca); } catch (erro) { console.error('Plano pessoal indisponível:', erro?.name || 'Erro'); $('#status-plano').textContent = 'O plano pessoal não está disponível neste navegador.'; }
-  try { estado.caixaAcolhimento = await armazenamento.buscarCaixaAcolhimento(); preencherCaixa(estado.caixaAcolhimento); } catch (erro) { console.error('Caixa indisponível:', erro?.name || 'Erro'); $('#status-caixa').textContent = 'A caixa de acolhimento não está disponível neste navegador.'; }
-  try { estado.perfil=await armazenamento.buscarPerfilAcolhimento();estado.feedbackApoio=await armazenamento.buscarFeedbackApoio();preencherPerfil(estado.perfil);mostrarFrase(); } catch(erro){console.error('Perfil indisponível:',erro?.name||'Erro');$('#status-perfil').textContent='O perfil não está disponível neste navegador.'}
+  await recarregarEstadoDoArmazenamento();
+  mostrarFrase();
   estado.armazenamentoPronto = true;
   alternarControlesArmazenamento(true);
-  renderizar();
   if(hashInicial){const alvo=document.getElementById(decodeURIComponent(hashInicial.slice(1)));requestAnimationFrame(()=>requestAnimationFrame(()=>alvo?.scrollIntoView({block:'start'})))}
   if (resultado.modo === 'indexeddb') {
     status(resultado.migracao.executada && resultado.migracao.quantidade > 0 ? `${resultado.migracao.quantidade} registro(s) preservado(s) no novo armazenamento local.` : 'Armazenamento local pronto.');
   } else {
     status('Não foi possível usar o novo armazenamento neste navegador. Seus dados antigos não foram apagados; o modo de segurança continua ativo. Recomendamos manter um backup.', true);
   }
+  mostrarSeletorModoConta();
+  tentarSincronizarAutomaticamente();
 }
 
 async function inicializarAplicacao() {

@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// Toda leitura/escrita exige autenticação e isolamento estrito por UID.
+// As coleções de dados só aceitam o formato já cifrado no aparelho
+// (nunca texto simples) — ver storage.js/sync.js para o formato do envelope.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /usuarios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && request.resource.data.saltSincronizacao is string
+                    && request.resource.data.hashVerificacaoSincronizacao is string
+                    && request.resource.data.iteracoesSincronizacao is int;
+
+      // O salt e o hash de verificação são imutáveis depois de criados:
+      // mudá-los invalidaria a chave de sincronização já derivada em outros aparelhos.
+      allow update: if request.auth != null && request.auth.uid == uid
+                    && request.resource.data.saltSincronizacao == resource.data.saltSincronizacao
+                    && request.resource.data.hashVerificacaoSincronizacao == resource.data.hashVerificacaoSincronizacao;
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
+
+      match /{colecao}/{docId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+
+        // atualizadoServidor precisa ser exatamente request.time (serverTimestamp()),
+        // então ninguém consegue forjar um carimbo de data/hora mais novo do que o real.
+        allow write: if request.auth != null && request.auth.uid == uid
+          && colecao in ['registros', 'planoSeguranca', 'perfilAcolhimento',
+                          'feedbackApoio', 'relatoriosSalvos', 'caixaAcolhimento']
+          && request.resource.data.cifrado == true
+          && request.resource.data.dados is string
+          && request.resource.data.iv is string
+          && request.resource.data.atualizadoServidor == request.time;
+      }
+    }
+
+    // Nenhum outro documento é permitido.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

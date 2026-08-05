@@ -1,4 +1,6 @@
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
 porto-seguro-beta-github.zip

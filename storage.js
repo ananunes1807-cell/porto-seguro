@@ -452,14 +452,27 @@ window.PortoSeguroStorage = (() => {
     await concluirTransacao(tx);
   }
 
+  async function buscarRelatorios() {
+    if (modo !== 'indexeddb') return [];
+    const tx = banco.transaction(STORE_RELATORIOS, 'readonly');
+    const lista = await requisicao(tx.objectStore(STORE_RELATORIOS).getAll());
+    const claros = [];
+    for (const bruto of lista) {
+      try { claros.push(await desempacotarGenerico(bruto, chaveAtual)); }
+      catch (erro) { console.error('Relatório não pôde ser lido:', erro?.name || 'Erro'); }
+    }
+    return claros;
+  }
+
   return {
     inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado,
     buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca,
     buscarCaixaAcolhimento, salvarCaixaAcolhimento, excluirCaixaAcolhimento,
     buscarAudioDiario, salvarAudioDiario, excluirAudioDiario,
     buscarPerfilAcolhimento, salvarPerfilAcolhimento, excluirPerfilAcolhimento,
-    buscarFeedbackApoio, salvarFeedbackApoio, salvarRelatorio,
+    buscarFeedbackApoio, salvarFeedbackApoio, salvarRelatorio, buscarRelatorios,
     definirChave, limparChave, temChave, migrarCriptografia, ativarCriptografiaInicial, criptografiaAtiva,
+    cifrarObjeto, decifrarObjeto,
     informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS, STORE_ACOLHIMENTO, STORE_AUDIOS, STORE_PERFIL, STORE_FEEDBACK, STORE_RELATORIOS], modo, cifrado: chaveAtual !== null })
   };
 })();

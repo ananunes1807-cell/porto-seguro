@@ -17,7 +17,7 @@
     <a class="logo" href="#inicio" aria-label="Porto Seguro, início"><span aria-hidden="true">♡</span> Porto Seguro</a>
     <button id="alternar-menu" class="botao-discreto menu-botao" type="button" aria-expanded="false" aria-controls="menu-principal">☰ Menu</button>
     <nav id="menu-principal" aria-label="Navegação principal">
-      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#perfil-acolhimento">Meu perfil</a><a href="#plano-seguranca">Meu plano</a><a href="#pos-crise">Pós-crise</a><a href="#caixa-acolhimento">Minha caixa</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="#protecao-local">Proteção</a><a href="privacidade.html">Privacidade</a>
+      <a href="#inicio">Início</a><a href="#apoio">Apoio</a><a href="#perfil-acolhimento">Meu perfil</a><a href="#plano-seguranca">Meu plano</a><a href="#pos-crise">Pós-crise</a><a href="#caixa-acolhimento">Minha caixa</a><a href="#diario">Diário</a><a href="#relatorios">Relatórios</a><a href="#protecao-local">Proteção</a><a href="#sincronizacao">Sincronizar</a><a href="privacidade.html">Privacidade</a>
     </nav>
     <button id="aumentar-fonte" class="botao-discreto" type="button" aria-pressed="false">Aumentar texto</button>
     <button id="theme-toggle" class="botao-discreto tema-botao" type="button" aria-label="Ativar modo escuro"><span aria-hidden="true">🌙</span></button>
@@ -31,6 +31,58 @@
     </section>
 
     <section id="protecao-local" class="card" aria-labelledby="titulo-protecao"><p class="etiqueta">Privacidade opcional</p><h2 id="titulo-protecao">Proteção de acesso neste aparelho</h2><p>Crie um PIN para bloquear a visualização do aplicativo e escolha o tempo de inatividade. Com um PIN ativo, o diário, o plano de segurança, a caixa de acolhimento e o perfil também passam a ser cifrados neste aparelho (AES-256), e não só escondidos atrás da tela.</p><p class="ajuda"><strong>Importante:</strong> o PIN não pode ser recuperado. Se você o esquecer, os dados cifrados não poderão ser lidos novamente neste aparelho — apenas restaurados a partir de um backup. Baixe backups com frequência.</p><form id="form-pin" class="formulario compacto"><div class="grade-dois"><div class="campo"><label for="novo-pin">Novo PIN com 4 a 8 números</label><input id="novo-pin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="8"></div><div class="campo"><label for="confirmar-pin">Confirmar PIN</label><input id="confirmar-pin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="8"></div></div><div class="campo"><label for="tempo-bloqueio">Bloquear após inatividade</label><select id="tempo-bloqueio"><option value="1">1 minuto</option><option value="5" selected>5 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option></select></div><p id="status-pin" class="status" role="status" aria-live="polite"></p><div class="acoes"><button class="botao-primario" type="submit">Ativar ou trocar PIN</button><button id="bloquear-agora" class="botao-secundario" type="button">Bloquear agora</button><button id="remover-pin" class="botao-perigo" type="button">Remover PIN</button></div></form><div class="aviso"><strong>Cópia antiga do diário.</strong> Depois que a migração for validada, você poderá remover a cópia legada do localStorage. Faça isso somente mantendo um backup recente.<div class="acoes"><button id="apagar-copia-antiga" class="botao-perigo" type="button">Apagar cópia antiga confirmada</button></div></div></section>
+
+    <section id="sincronizacao" class="card" aria-labelledby="titulo-sincronizacao">
+      <p class="etiqueta">Opcional</p><h2 id="titulo-sincronizacao">Sincronizar entre aparelhos</h2>
+      <p>Crie uma conta para acessar o mesmo diário, plano de segurança e relatórios no celular e no computador. O modo somente local continua funcionando normalmente sem isso.</p>
+      <div class="aviso-critico" role="note"><strong>⚠️ Isto envia dados cifrados para a internet.</strong> Mesmo cifrados, eles passam a existir em um servidor do Firebase/Google, fora deste aparelho. Se alguém com quem você mora tem acesso ao seu e-mail ou conta Google, não ative a sincronização em um aparelho que essa pessoa também usa ou possa monitorar.</div>
+
+      <div id="sync-deslogado">
+        <form id="form-sync-entrar" class="formulario compacto">
+          <div class="grade-dois">
+            <div class="campo"><label for="sync-email">E-mail</label><input id="sync-email" type="email" autocomplete="email"></div>
+            <div class="campo"><label for="sync-senha">Senha</label><input id="sync-senha" type="password" autocomplete="current-password"></div>
+          </div>
+          <p id="status-sync-conta" class="status" role="status" aria-live="polite"></p>
+          <div class="acoes">
+            <button id="sync-entrar" class="botao-primario" type="submit">Entrar</button>
+            <button id="sync-criar-conta" class="botao-secundario" type="button">Criar conta</button>
+            <button id="sync-google" class="botao-secundario" type="button">Entrar com Google</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="sync-logado" hidden>
+        <p id="status-sync-sessao" class="status" role="status" aria-live="polite"></p>
+
+        <div id="sync-precisa-chave" hidden>
+          <p class="ajuda">Digite a chave de sincronização desta conta para continuar. Ela é diferente da senha de login e nunca é enviada ao Firebase.</p>
+          <form id="form-sync-chave" class="formulario compacto">
+            <div class="campo"><label for="sync-chave-frase">Chave de sincronização</label><input id="sync-chave-frase" type="password" autocomplete="off"></div>
+            <p id="status-sync-chave" class="status" role="status" aria-live="polite"></p>
+            <button class="botao-primario" type="submit">Desbloquear sincronização</button>
+          </form>
+        </div>
+
+        <div id="sync-configurar-chave" hidden>
+          <p class="ajuda">Esta conta ainda não tem uma chave de sincronização. Crie uma agora — ela é o que protege seus dados na nuvem.</p>
+          <div class="aviso-critico" role="note"><strong>⚠️ Guarde esta chave com cuidado.</strong> Ela não pode ser recuperada. Se você a esquecer, os dados já sincronizados na nuvem ficarão permanentemente ilegíveis — mesmo que você ainda consiga entrar na conta.</div>
+          <form id="form-sync-nova-chave" class="formulario compacto">
+            <div class="grade-dois">
+              <div class="campo"><label for="sync-nova-chave">Nova chave de sincronização</label><input id="sync-nova-chave" type="password" autocomplete="new-password"></div>
+              <div class="campo"><label for="sync-confirmar-chave">Confirmar chave</label><input id="sync-confirmar-chave" type="password" autocomplete="new-password"></div>
+            </div>
+            <p id="status-sync-nova-chave" class="status" role="status" aria-live="polite"></p>
+            <button class="botao-primario" type="submit">Criar chave de sincronização</button>
+          </form>
+        </div>
+
+        <div id="sync-pronto" hidden>
+          <p id="status-sync-ultima" class="ajuda"></p>
+          <div class="acoes"><button id="sync-agora" class="botao-secundario" type="button">Sincronizar agora</button><button id="sync-sair" class="botao-perigo" type="button">Sair desta conta</button></div>
+        </div>
+      </div>
+    </section>
 
     <section id="apoio" class="card" aria-labelledby="titulo-apoio">
       <p class="etiqueta">Apoio</p><h2 id="titulo-apoio">Você não precisa explicar tudo agora.</h2><p>Escolha apenas o que parece possível neste momento.</p>
@@ -156,8 +208,11 @@
 
   <div id="tela-restauracao" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-restauracao"><h2 id="titulo-restauracao">Como deseja restaurar?</h2><p id="resumo-backup"></p><div class="acoes"><button id="mesclar-backup" class="botao-primario" type="button">Mesclar sem duplicar</button><button id="substituir-backup" class="botao-perigo" type="button">Substituir registros atuais</button><button id="cancelar-backup" class="botao-secundario" type="button">Cancelar</button></div></section></div>
 
+  <div id="tela-modo-conta" class="modal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-modo-conta"><p class="etiqueta">Antes de começar</p><h2 id="titulo-modo-conta">Como você quer usar o Porto Seguro?</h2><div class="grade-acoes"><button id="modo-somente-local" class="botao-acao" type="button"><strong>Continuar somente neste aparelho</strong><span>Nada é enviado pela internet. Recomendado por padrão.</span></button><button id="modo-sincronizado" class="botao-acao" type="button"><strong>Entrar e sincronizar meus dados</strong><span>Acesse o mesmo diário no celular e no computador.</span></button></div><p class="ajuda">Você pode mudar isso depois em "Sincronizar entre aparelhos".</p></section></div>
+
   <template id="modelo-registro"><article class="card-registro"><div class="cabecalho-registro"><div><h3 class="registro-titulo"></h3><p class="registro-resumo"></p></div><span class="registro-intensidade"></span></div><p class="registro-texto-resumo"></p><button class="alternar-registro botao-discreto" type="button" aria-expanded="false">Ver registro completo</button><div class="registro-completo" hidden><p class="registro-sentimento"></p><p class="registro-data"></p><p class="registro-texto"></p><div class="detalhes-registro"></div><div class="registro-audio"></div><p class="registro-transcricao"></p><p class="registro-edicao"></p><label class="selecionar"><input class="selecionar-registro" type="checkbox"> Incluir no relatório</label><div class="acoes-registro"><button class="editar-registro" type="button">Editar</button><button class="imprimir-registro" type="button">Imprimir</button><button class="excluir-registro botao-perigo" type="button">Excluir</button></div></div></article></template>
   <script src="storage.js"></script>
   <script src="script.js"></script>
+  <script type="module" src="sync.js"></script>
 </body>
 </html>
