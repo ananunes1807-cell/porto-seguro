@@ -13,9 +13,11 @@ window.PortoSeguroStorage = (() => {
   const STORE_FEEDBACK = 'feedbackApoio';
   const STORE_RELATORIOS = 'relatoriosSalvos';
   const META_MIGRACAO = 'migracaoLocalStorageV1';
+  const META_CRIPTO = 'criptografiaV1';
   let banco = null;
   let modo = 'indexeddb';
   let configuracao = null;
+  let chaveAtual = null; // CryptoKey AES-GCM em memória; nunca é persistida. Ausente = dados em texto simples.
 
   function requisicao(req) {
     return new Promise((resolve, reject) => {
@@ -64,6 +66,184 @@ window.PortoSeguroStorage = (() => {
     });
   }
 
+  // --- Criptografia local (AES-GCM 256, chave derivada do PIN) -------------
+  // Cada registro guarda seus campos-chave em claro (necessários como keyPath do
+  // IndexedDB) e o restante cifrado em `{iv, dados}`. Sem PIN configurado, `chaveAtual`
+  // permanece nula e tudo é lido/gravado em texto simples, como antes desta camada.
+
+  function bytesBase64(bytes) { return btoa(String.fromCharCode(...bytes)); }
+  function base64Bytes(b64) { return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+
+  function definirChave(chave) { chaveAtual = chave || null; }
+  function limparChave() { chaveAtual = null; }
+  function temChave() { return chaveAtual !== null; }
+
+  async function cifrarObjeto(chave, objeto) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const bytes = new TextEncoder().encode(JSON.stringify(objeto));
+    const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, chave, bytes));
+    return { iv: bytesBase64(iv), dados: bytesBase64(cifrado) };
+  }
+
+  async function decifrarObjeto(chave, envelope) {
+    const iv = base64Bytes(envelope.iv), dados = base64Bytes(envelope.dados);
+    const claro = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, chave, dados);
+    return JSON.parse(new TextDecoder().decode(claro));
+  }
+
+  async function cifrarBlob(chave, blob) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, chave, bytes));
+    const combinado = new Uint8Array(iv.length + cifrado.length);
+    combinado.set(iv);
+    combinado.set(cifrado, iv.length);
+    return new Blob([combinado], { type: 'application/octet-stream' });
+  }
+
+  async function decifrarBlob(chave, blobCifrado, tipoOriginal) {
+    const bytes = new Uint8Array(await blobCifrado.arrayBuffer());
+    const iv = bytes.slice(0, 12), dados = bytes.slice(12);
+    const claro = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, chave, dados);
+    return new Blob([claro], { type: tipoOriginal || 'application/octet-stream' });
+  }
+
+  // Envelopa/desenvelopa registros simples (sem Blob), mantendo `camposClaros` fora da cifra.
+  async function empacotarGenerico(valor, camposClaros, chave) {
+    if (!chave) return valor;
+    const claros = {}, resto = { ...valor };
+    camposClaros.forEach(c => { claros[c] = resto[c]; delete resto[c]; });
+    const envelope = await cifrarObjeto(chave, resto);
+    return { ...claros, cifrado: true, iv: envelope.iv, dados: envelope.dados };
+  }
+
+  async function desempacotarGenerico(bruto, chave) {
+    if (!bruto || !bruto.cifrado) return bruto;
+    if (!chave) throw new Error('Dados protegidos por PIN; desbloqueie para lê-los.');
+    const resto = await decifrarObjeto(chave, bruto);
+    const { cifrado, iv, dados, ...claros } = bruto;
+    return { ...claros, ...resto };
+  }
+
+  // Caixa de acolhimento tem campos de Blob (foto/áudio) que não cabem no JSON cifrado.
+  async function empacotarCaixaGenerico(caixa, chave) {
+    if (!chave) return caixa;
+    const { id, photo, audio, ...resto } = caixa;
+    const envelope = await cifrarObjeto(chave, resto);
+    const photoCifrada = photo instanceof Blob ? await cifrarBlob(chave, photo) : null;
+    const audioCifrado = audio instanceof Blob ? await cifrarBlob(chave, audio) : null;
+    return { id, cifrado: true, iv: envelope.iv, dados: envelope.dados, photo: photoCifrada, photoTipo: photo instanceof Blob ? photo.type : null, audio: audioCifrado, audioTipo: audio instanceof Blob ? audio.type : null };
+  }
+
+  async function desempacotarCaixaGenerico(bruto, chave) {
+    if (!bruto || !bruto.cifrado) return bruto;
+    if (!chave) throw new Error('Dados protegidos por PIN; desbloqueie para lê-los.');
+    const resto = await decifrarObjeto(chave, bruto);
+    const photo = bruto.photo instanceof Blob ? await decifrarBlob(chave, bruto.photo, bruto.photoTipo) : null;
+    const audio = bruto.audio instanceof Blob ? await decifrarBlob(chave, bruto.audio, bruto.audioTipo) : null;
+    return { id: bruto.id, ...resto, photo, audio };
+  }
+
+  async function empacotarAudioGenerico(item, chave) {
+    if (!chave) return item;
+    const blobCifrado = await cifrarBlob(chave, item.blob);
+    return { recordId: item.recordId, cifrado: true, blob: blobCifrado, tipoOriginal: item.blob.type, createdAt: item.createdAt };
+  }
+
+  async function desempacotarAudioGenerico(bruto, chave) {
+    if (!bruto || !bruto.cifrado) return bruto;
+    if (!chave) throw new Error('Áudio protegido por PIN; desbloqueie para ouvi-lo.');
+    const blob = await decifrarBlob(chave, bruto.blob, bruto.tipoOriginal);
+    return { recordId: bruto.recordId, blob, createdAt: bruto.createdAt };
+  }
+
+  async function marcarCriptografia(ativa) {
+    const tx = banco.transaction(STORE_METADADOS, 'readwrite');
+    tx.objectStore(STORE_METADADOS).put({ key: META_CRIPTO, ativada: Boolean(ativa), atualizadoEm: new Date().toISOString() });
+    await concluirTransacao(tx);
+  }
+
+  async function reescreverStorePadrao(nomeStore, camposClaros, chaveLeitura, chaveEscrita) {
+    const txLeitura = banco.transaction(nomeStore, 'readonly');
+    const brutos = await requisicao(txLeitura.objectStore(nomeStore).getAll());
+    if (!brutos.length) return;
+    const reescritos = [];
+    for (const bruto of brutos) {
+      try {
+        const claro = await desempacotarGenerico(bruto, chaveLeitura);
+        reescritos.push(await empacotarGenerico(claro, camposClaros, chaveEscrita));
+      } catch (erro) { console.error(`Item de ${nomeStore} não pôde ser migrado:`, erro?.name || 'Erro'); }
+    }
+    const tx = banco.transaction(nomeStore, 'readwrite');
+    const store = tx.objectStore(nomeStore);
+    reescritos.forEach(item => store.put(item));
+    await concluirTransacao(tx);
+  }
+
+  async function reescreverCaixaStore(chaveLeitura, chaveEscrita) {
+    const txLeitura = banco.transaction(STORE_ACOLHIMENTO, 'readonly');
+    const bruto = await requisicao(txLeitura.objectStore(STORE_ACOLHIMENTO).get('minha-caixa'));
+    if (!bruto) return;
+    const claro = await desempacotarCaixaGenerico(bruto, chaveLeitura);
+    const novo = await empacotarCaixaGenerico(claro, chaveEscrita);
+    const tx = banco.transaction(STORE_ACOLHIMENTO, 'readwrite');
+    tx.objectStore(STORE_ACOLHIMENTO).put(novo);
+    await concluirTransacao(tx);
+  }
+
+  async function reescreverAudiosStore(chaveLeitura, chaveEscrita) {
+    const txLeitura = banco.transaction(STORE_AUDIOS, 'readonly');
+    const brutos = await requisicao(txLeitura.objectStore(STORE_AUDIOS).getAll());
+    if (!brutos.length) return;
+    const reescritos = [];
+    for (const bruto of brutos) {
+      try {
+        const claro = await desempacotarAudioGenerico(bruto, chaveLeitura);
+        reescritos.push(await empacotarAudioGenerico(claro, chaveEscrita));
+      } catch (erro) { console.error('Áudio não pôde ser migrado:', erro?.name || 'Erro'); }
+    }
+    const tx = banco.transaction(STORE_AUDIOS, 'readwrite');
+    const store = tx.objectStore(STORE_AUDIOS);
+    reescritos.forEach(item => store.put(item));
+    await concluirTransacao(tx);
+  }
+
+  async function reescreverArmazenamento(chaveLeitura, chaveEscrita) {
+    await reescreverStorePadrao(STORE_REGISTROS, ['id'], chaveLeitura, chaveEscrita);
+    await reescreverStorePadrao(STORE_PLANOS, ['id'], chaveLeitura, chaveEscrita);
+    await reescreverStorePadrao(STORE_PERFIL, ['id'], chaveLeitura, chaveEscrita);
+    await reescreverStorePadrao(STORE_FEEDBACK, ['id'], chaveLeitura, chaveEscrita);
+    await reescreverStorePadrao(STORE_RELATORIOS, ['id'], chaveLeitura, chaveEscrita);
+    await reescreverCaixaStore(chaveLeitura, chaveEscrita);
+    await reescreverAudiosStore(chaveLeitura, chaveEscrita);
+  }
+
+  // Usado ao criar ou trocar o PIN: decifra tudo com a chave atual (se houver) e
+  // regrava com `chaveNova` (ou em texto simples, se `chaveNova` for nula ao remover o PIN).
+  async function migrarCriptografia(chaveNova) {
+    if (modo !== 'indexeddb') { chaveAtual = chaveNova || null; return; }
+    await reescreverArmazenamento(chaveAtual, chaveNova);
+    chaveAtual = chaveNova || null;
+    await marcarCriptografia(Boolean(chaveNova));
+  }
+
+  // Usado em desbloqueios normais: cobre dados que ainda estejam em texto simples
+  // (aparelhos que já tinham PIN antes desta camada existir). Não repete o trabalho
+  // depois da primeira vez, graças ao marcador em STORE_METADADOS.
+  async function ativarCriptografiaInicial() {
+    if (modo !== 'indexeddb' || !chaveAtual) return;
+    const meta = await buscarMetadado(META_CRIPTO);
+    if (meta?.ativada) return;
+    await reescreverArmazenamento(chaveAtual, chaveAtual);
+    await marcarCriptografia(true);
+  }
+
+  async function criptografiaAtiva() {
+    if (modo !== 'indexeddb') return false;
+    const meta = await buscarMetadado(META_CRIPTO);
+    return Boolean(meta?.ativada);
+  }
+
   async function buscarMetadado(key) {
     const tx = banco.transaction(STORE_METADADOS, 'readonly');
     return requisicao(tx.objectStore(STORE_METADADOS).get(key));
@@ -102,7 +282,12 @@ window.PortoSeguroStorage = (() => {
   async function buscarTodosIndexedDB() {
     const tx = banco.transaction(STORE_REGISTROS, 'readonly');
     const lista = await requisicao(tx.objectStore(STORE_REGISTROS).getAll());
-    return lista.map(configuracao.normalizarRegistro).filter(Boolean).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    const claros = [];
+    for (const bruto of lista) {
+      try { claros.push(await desempacotarGenerico(bruto, chaveAtual)); }
+      catch (erro) { console.error('Registro não pôde ser lido:', erro?.name || 'Erro'); }
+    }
+    return claros.map(configuracao.normalizarRegistro).filter(Boolean).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   }
 
   function salvarFallback(lista) {
@@ -132,7 +317,8 @@ window.PortoSeguroStorage = (() => {
   async function buscarPorId(id) {
     if (modo !== 'indexeddb') return (await buscarTodos()).find(item => item.id === id) || null;
     const tx = banco.transaction(STORE_REGISTROS, 'readonly');
-    return requisicao(tx.objectStore(STORE_REGISTROS).get(id));
+    const bruto = await requisicao(tx.objectStore(STORE_REGISTROS).get(id));
+    return desempacotarGenerico(bruto, chaveAtual);
   }
 
   async function salvar(registro) {
@@ -143,8 +329,9 @@ window.PortoSeguroStorage = (() => {
       salvarFallback(lista);
       return;
     }
+    const paraGravar = await empacotarGenerico(registro, ['id'], chaveAtual);
     const tx = banco.transaction(STORE_REGISTROS, 'readwrite');
-    tx.objectStore(STORE_REGISTROS).put(registro);
+    tx.objectStore(STORE_REGISTROS).put(paraGravar);
     await concluirTransacao(tx);
   }
 
@@ -162,23 +349,27 @@ window.PortoSeguroStorage = (() => {
       salvarFallback([...new Map([...atuais, ...lista].map(item => [item.id, item])).values()]);
       return;
     }
+    const paraGravar = [];
+    for (const item of lista) paraGravar.push(await empacotarGenerico(item, ['id'], chaveAtual));
     const tx = banco.transaction(STORE_REGISTROS, 'readwrite');
     const store = tx.objectStore(STORE_REGISTROS);
     if (substituir) store.clear();
-    lista.forEach(item => store.put(item));
+    paraGravar.forEach(item => store.put(item));
     await concluirTransacao(tx);
   }
 
   async function buscarPlanoSeguranca() {
     if (modo !== 'indexeddb') return null;
     const tx = banco.transaction(STORE_PLANOS, 'readonly');
-    return requisicao(tx.objectStore(STORE_PLANOS).get('plano-pessoal'));
+    const bruto = await requisicao(tx.objectStore(STORE_PLANOS).get('plano-pessoal'));
+    return desempacotarGenerico(bruto, chaveAtual);
   }
 
   async function salvarPlanoSeguranca(plano) {
     if (modo !== 'indexeddb') throw new Error('O plano pessoal requer IndexedDB neste navegador.');
+    const paraGravar = await empacotarGenerico({ ...plano, id: 'plano-pessoal' }, ['id'], chaveAtual);
     const tx = banco.transaction(STORE_PLANOS, 'readwrite');
-    tx.objectStore(STORE_PLANOS).put({ ...plano, id: 'plano-pessoal' });
+    tx.objectStore(STORE_PLANOS).put(paraGravar);
     await concluirTransacao(tx);
   }
 
@@ -189,18 +380,86 @@ window.PortoSeguroStorage = (() => {
     await concluirTransacao(tx);
   }
 
-  async function buscarCaixaAcolhimento() { if (modo !== 'indexeddb') return null; const tx=banco.transaction(STORE_ACOLHIMENTO,'readonly'); return requisicao(tx.objectStore(STORE_ACOLHIMENTO).get('minha-caixa')); }
-  async function salvarCaixaAcolhimento(caixa) { if(modo!=='indexeddb') throw new Error('IndexedDB indisponível.'); const tx=banco.transaction(STORE_ACOLHIMENTO,'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).put({...caixa,id:'minha-caixa'}); await concluirTransacao(tx); }
-  async function excluirCaixaAcolhimento() { if(modo!=='indexeddb') return; const tx=banco.transaction(STORE_ACOLHIMENTO,'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).delete('minha-caixa'); await concluirTransacao(tx); }
-  async function buscarAudioDiario(recordId) { if(modo!=='indexeddb') return null; const tx=banco.transaction(STORE_AUDIOS,'readonly'); return requisicao(tx.objectStore(STORE_AUDIOS).get(recordId)); }
-  async function salvarAudioDiario(recordId, blob) { if(modo!=='indexeddb') throw new Error('IndexedDB indisponível.'); const tx=banco.transaction(STORE_AUDIOS,'readwrite'); tx.objectStore(STORE_AUDIOS).put({recordId,blob,createdAt:new Date().toISOString()}); await concluirTransacao(tx); }
-  async function excluirAudioDiario(recordId) { if(modo!=='indexeddb') return; const tx=banco.transaction(STORE_AUDIOS,'readwrite'); tx.objectStore(STORE_AUDIOS).delete(recordId); await concluirTransacao(tx); }
-  async function buscarPerfilAcolhimento(){if(modo!=='indexeddb')return null;const tx=banco.transaction(STORE_PERFIL,'readonly');return requisicao(tx.objectStore(STORE_PERFIL).get('meu-perfil'))}
-  async function salvarPerfilAcolhimento(perfil){if(modo!=='indexeddb')throw new Error('IndexedDB indisponível.');const tx=banco.transaction(STORE_PERFIL,'readwrite');tx.objectStore(STORE_PERFIL).put({...perfil,id:'meu-perfil'});await concluirTransacao(tx)}
-  async function excluirPerfilAcolhimento(){if(modo!=='indexeddb')return;const tx=banco.transaction(STORE_PERFIL,'readwrite');tx.objectStore(STORE_PERFIL).delete('meu-perfil');await concluirTransacao(tx)}
-  async function buscarFeedbackApoio(){if(modo!=='indexeddb')return[];const tx=banco.transaction(STORE_FEEDBACK,'readonly');return requisicao(tx.objectStore(STORE_FEEDBACK).getAll())}
-  async function salvarFeedbackApoio(item){if(modo!=='indexeddb')return;const tx=banco.transaction(STORE_FEEDBACK,'readwrite');tx.objectStore(STORE_FEEDBACK).put(item);await concluirTransacao(tx)}
-  async function salvarRelatorio(item){if(modo!=='indexeddb')throw new Error('IndexedDB indisponível.');const tx=banco.transaction(STORE_RELATORIOS,'readwrite');tx.objectStore(STORE_RELATORIOS).put(item);await concluirTransacao(tx)}
+  async function buscarCaixaAcolhimento() {
+    if (modo !== 'indexeddb') return null;
+    const tx = banco.transaction(STORE_ACOLHIMENTO, 'readonly');
+    const bruto = await requisicao(tx.objectStore(STORE_ACOLHIMENTO).get('minha-caixa'));
+    return desempacotarCaixaGenerico(bruto, chaveAtual);
+  }
+  async function salvarCaixaAcolhimento(caixa) {
+    if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
+    const paraGravar = await empacotarCaixaGenerico({ ...caixa, id: 'minha-caixa' }, chaveAtual);
+    const tx = banco.transaction(STORE_ACOLHIMENTO, 'readwrite');
+    tx.objectStore(STORE_ACOLHIMENTO).put(paraGravar);
+    await concluirTransacao(tx);
+  }
+  async function excluirCaixaAcolhimento() { if (modo !== 'indexeddb') return; const tx = banco.transaction(STORE_ACOLHIMENTO, 'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).delete('minha-caixa'); await concluirTransacao(tx); }
 
-  return { inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado, buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca, buscarCaixaAcolhimento, salvarCaixaAcolhimento, excluirCaixaAcolhimento, buscarAudioDiario, salvarAudioDiario, excluirAudioDiario, buscarPerfilAcolhimento, salvarPerfilAcolhimento, excluirPerfilAcolhimento, buscarFeedbackApoio, salvarFeedbackApoio, salvarRelatorio, informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS, STORE_ACOLHIMENTO, STORE_AUDIOS, STORE_PERFIL, STORE_FEEDBACK, STORE_RELATORIOS], modo }) };
+  async function buscarAudioDiario(recordId) {
+    if (modo !== 'indexeddb') return null;
+    const tx = banco.transaction(STORE_AUDIOS, 'readonly');
+    const bruto = await requisicao(tx.objectStore(STORE_AUDIOS).get(recordId));
+    return desempacotarAudioGenerico(bruto, chaveAtual);
+  }
+  async function salvarAudioDiario(recordId, blob) {
+    if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
+    const paraGravar = await empacotarAudioGenerico({ recordId, blob, createdAt: new Date().toISOString() }, chaveAtual);
+    const tx = banco.transaction(STORE_AUDIOS, 'readwrite');
+    tx.objectStore(STORE_AUDIOS).put(paraGravar);
+    await concluirTransacao(tx);
+  }
+  async function excluirAudioDiario(recordId) { if (modo !== 'indexeddb') return; const tx = banco.transaction(STORE_AUDIOS, 'readwrite'); tx.objectStore(STORE_AUDIOS).delete(recordId); await concluirTransacao(tx); }
+
+  async function buscarPerfilAcolhimento() {
+    if (modo !== 'indexeddb') return null;
+    const tx = banco.transaction(STORE_PERFIL, 'readonly');
+    const bruto = await requisicao(tx.objectStore(STORE_PERFIL).get('meu-perfil'));
+    return desempacotarGenerico(bruto, chaveAtual);
+  }
+  async function salvarPerfilAcolhimento(perfil) {
+    if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
+    const paraGravar = await empacotarGenerico({ ...perfil, id: 'meu-perfil' }, ['id'], chaveAtual);
+    const tx = banco.transaction(STORE_PERFIL, 'readwrite');
+    tx.objectStore(STORE_PERFIL).put(paraGravar);
+    await concluirTransacao(tx);
+  }
+  async function excluirPerfilAcolhimento() { if (modo !== 'indexeddb') return; const tx = banco.transaction(STORE_PERFIL, 'readwrite'); tx.objectStore(STORE_PERFIL).delete('meu-perfil'); await concluirTransacao(tx); }
+
+  async function buscarFeedbackApoio() {
+    if (modo !== 'indexeddb') return [];
+    const tx = banco.transaction(STORE_FEEDBACK, 'readonly');
+    const lista = await requisicao(tx.objectStore(STORE_FEEDBACK).getAll());
+    const claros = [];
+    for (const bruto of lista) {
+      try { claros.push(await desempacotarGenerico(bruto, chaveAtual)); }
+      catch (erro) { console.error('Item de feedback não pôde ser lido:', erro?.name || 'Erro'); }
+    }
+    return claros;
+  }
+  async function salvarFeedbackApoio(item) {
+    if (modo !== 'indexeddb') return;
+    const paraGravar = await empacotarGenerico(item, ['id'], chaveAtual);
+    const tx = banco.transaction(STORE_FEEDBACK, 'readwrite');
+    tx.objectStore(STORE_FEEDBACK).put(paraGravar);
+    await concluirTransacao(tx);
+  }
+
+  async function salvarRelatorio(item) {
+    if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
+    const paraGravar = await empacotarGenerico(item, ['id'], chaveAtual);
+    const tx = banco.transaction(STORE_RELATORIOS, 'readwrite');
+    tx.objectStore(STORE_RELATORIOS).put(paraGravar);
+    await concluirTransacao(tx);
+  }
+
+  return {
+    inicializar, buscarTodos, buscarPorId, salvar, excluir, importar, buscarMetadado,
+    buscarPlanoSeguranca, salvarPlanoSeguranca, excluirPlanoSeguranca,
+    buscarCaixaAcolhimento, salvarCaixaAcolhimento, excluirCaixaAcolhimento,
+    buscarAudioDiario, salvarAudioDiario, excluirAudioDiario,
+    buscarPerfilAcolhimento, salvarPerfilAcolhimento, excluirPerfilAcolhimento,
+    buscarFeedbackApoio, salvarFeedbackApoio, salvarRelatorio,
+    definirChave, limparChave, temChave, migrarCriptografia, ativarCriptografiaInicial, criptografiaAtiva,
+    informacoes: () => ({ nome: NOME_BANCO, versao: VERSAO_BANCO, stores: [STORE_REGISTROS, STORE_METADADOS, STORE_PLANOS, STORE_ACOLHIMENTO, STORE_AUDIOS, STORE_PERFIL, STORE_FEEDBACK, STORE_RELATORIOS], modo, cifrado: chaveAtual !== null })
+  };
 })();
