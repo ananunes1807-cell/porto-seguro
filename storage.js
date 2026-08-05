@@ -15,6 +15,7 @@ window.PortoSeguroStorage = (() => {
   const META_MIGRACAO = 'migracaoLocalStorageV1';
   const META_CRIPTO = 'criptografiaV1';
   let banco = null;
+  let promessaReabertura = null;
   let modo = 'indexeddb';
   let configuracao = null;
   let chaveAtual = null; // CryptoKey AES-GCM em memória; nunca é persistida. Ausente = dados em texto simples.
@@ -58,12 +59,24 @@ window.PortoSeguroStorage = (() => {
       };
       abertura.onsuccess = () => {
         banco = abertura.result;
-        banco.onversionchange = () => banco.close();
+        // Se outra aba precisar atualizar o esquema, ou se os dados deste site forem apagados
+        // enquanto o app está aberto, a conexão fecha e a referência é limpa: a próxima operação
+        // reabre sozinha em vez de ficar presa com uma conexão morta (veja obterBanco()).
+        banco.onversionchange = () => { banco.close(); banco = null; };
+        banco.onclose = () => { banco = null; };
         resolve(banco);
       };
       abertura.onerror = () => reject(abertura.error || new Error('Não foi possível abrir o banco local.'));
       abertura.onblocked = () => reject(new Error('A atualização do banco foi bloqueada por outra aba.'));
     });
+  }
+
+  // Toda operação deve pegar o banco por aqui, nunca ler a variável `banco` direto:
+  // se a conexão tiver caído (fechamento externo), reabre automaticamente.
+  async function obterBanco() {
+    if (banco) return banco;
+    if (!promessaReabertura) promessaReabertura = abrirBanco().finally(() => { promessaReabertura = null; });
+    return promessaReabertura;
   }
 
   // --- Criptografia local (AES-GCM 256, chave derivada do PIN) -------------
@@ -158,13 +171,13 @@ window.PortoSeguroStorage = (() => {
   }
 
   async function marcarCriptografia(ativa) {
-    const tx = banco.transaction(STORE_METADADOS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_METADADOS, 'readwrite');
     tx.objectStore(STORE_METADADOS).put({ key: META_CRIPTO, ativada: Boolean(ativa), atualizadoEm: new Date().toISOString() });
     await concluirTransacao(tx);
   }
 
   async function reescreverStorePadrao(nomeStore, camposClaros, chaveLeitura, chaveEscrita) {
-    const txLeitura = banco.transaction(nomeStore, 'readonly');
+    const txLeitura = (await obterBanco()).transaction(nomeStore, 'readonly');
     const brutos = await requisicao(txLeitura.objectStore(nomeStore).getAll());
     if (!brutos.length) return;
     const reescritos = [];
@@ -174,25 +187,25 @@ window.PortoSeguroStorage = (() => {
         reescritos.push(await empacotarGenerico(claro, camposClaros, chaveEscrita));
       } catch (erro) { console.error(`Item de ${nomeStore} não pôde ser migrado:`, erro?.name || 'Erro'); }
     }
-    const tx = banco.transaction(nomeStore, 'readwrite');
+    const tx = (await obterBanco()).transaction(nomeStore, 'readwrite');
     const store = tx.objectStore(nomeStore);
     reescritos.forEach(item => store.put(item));
     await concluirTransacao(tx);
   }
 
   async function reescreverCaixaStore(chaveLeitura, chaveEscrita) {
-    const txLeitura = banco.transaction(STORE_ACOLHIMENTO, 'readonly');
+    const txLeitura = (await obterBanco()).transaction(STORE_ACOLHIMENTO, 'readonly');
     const bruto = await requisicao(txLeitura.objectStore(STORE_ACOLHIMENTO).get('minha-caixa'));
     if (!bruto) return;
     const claro = await desempacotarCaixaGenerico(bruto, chaveLeitura);
     const novo = await empacotarCaixaGenerico(claro, chaveEscrita);
-    const tx = banco.transaction(STORE_ACOLHIMENTO, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_ACOLHIMENTO, 'readwrite');
     tx.objectStore(STORE_ACOLHIMENTO).put(novo);
     await concluirTransacao(tx);
   }
 
   async function reescreverAudiosStore(chaveLeitura, chaveEscrita) {
-    const txLeitura = banco.transaction(STORE_AUDIOS, 'readonly');
+    const txLeitura = (await obterBanco()).transaction(STORE_AUDIOS, 'readonly');
     const brutos = await requisicao(txLeitura.objectStore(STORE_AUDIOS).getAll());
     if (!brutos.length) return;
     const reescritos = [];
@@ -202,7 +215,7 @@ window.PortoSeguroStorage = (() => {
         reescritos.push(await empacotarAudioGenerico(claro, chaveEscrita));
       } catch (erro) { console.error('Áudio não pôde ser migrado:', erro?.name || 'Erro'); }
     }
-    const tx = banco.transaction(STORE_AUDIOS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_AUDIOS, 'readwrite');
     const store = tx.objectStore(STORE_AUDIOS);
     reescritos.forEach(item => store.put(item));
     await concluirTransacao(tx);
@@ -245,7 +258,7 @@ window.PortoSeguroStorage = (() => {
   }
 
   async function buscarMetadado(key) {
-    const tx = banco.transaction(STORE_METADADOS, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_METADADOS, 'readonly');
     return requisicao(tx.objectStore(STORE_METADADOS).get(key));
   }
 
@@ -263,7 +276,7 @@ window.PortoSeguroStorage = (() => {
   async function migrarLocalStorage() {
     if (await buscarMetadado(META_MIGRACAO)) return { executada: false, quantidade: 0 };
     const antigos = lerCopiaLocal();
-    const tx = banco.transaction([STORE_REGISTROS, STORE_METADADOS], 'readwrite');
+    const tx = (await obterBanco()).transaction([STORE_REGISTROS, STORE_METADADOS], 'readwrite');
     const store = tx.objectStore(STORE_REGISTROS);
     const meta = tx.objectStore(STORE_METADADOS);
     const idsExistentes = new Set(await requisicao(store.getAllKeys()));
@@ -280,7 +293,7 @@ window.PortoSeguroStorage = (() => {
   }
 
   async function buscarTodosIndexedDB() {
-    const tx = banco.transaction(STORE_REGISTROS, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_REGISTROS, 'readonly');
     const lista = await requisicao(tx.objectStore(STORE_REGISTROS).getAll());
     const claros = [];
     for (const bruto of lista) {
@@ -316,7 +329,7 @@ window.PortoSeguroStorage = (() => {
 
   async function buscarPorId(id) {
     if (modo !== 'indexeddb') return (await buscarTodos()).find(item => item.id === id) || null;
-    const tx = banco.transaction(STORE_REGISTROS, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_REGISTROS, 'readonly');
     const bruto = await requisicao(tx.objectStore(STORE_REGISTROS).get(id));
     return desempacotarGenerico(bruto, chaveAtual);
   }
@@ -330,14 +343,14 @@ window.PortoSeguroStorage = (() => {
       return;
     }
     const paraGravar = await empacotarGenerico(registro, ['id'], chaveAtual);
-    const tx = banco.transaction(STORE_REGISTROS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_REGISTROS, 'readwrite');
     tx.objectStore(STORE_REGISTROS).put(paraGravar);
     await concluirTransacao(tx);
   }
 
   async function excluir(id) {
     if (modo !== 'indexeddb') return salvarFallback((await buscarTodos()).filter(item => item.id !== id));
-    const tx = banco.transaction([STORE_REGISTROS, STORE_AUDIOS], 'readwrite');
+    const tx = (await obterBanco()).transaction([STORE_REGISTROS, STORE_AUDIOS], 'readwrite');
     tx.objectStore(STORE_REGISTROS).delete(id);
     tx.objectStore(STORE_AUDIOS).delete(id);
     await concluirTransacao(tx);
@@ -351,7 +364,7 @@ window.PortoSeguroStorage = (() => {
     }
     const paraGravar = [];
     for (const item of lista) paraGravar.push(await empacotarGenerico(item, ['id'], chaveAtual));
-    const tx = banco.transaction(STORE_REGISTROS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_REGISTROS, 'readwrite');
     const store = tx.objectStore(STORE_REGISTROS);
     if (substituir) store.clear();
     paraGravar.forEach(item => store.put(item));
@@ -360,7 +373,7 @@ window.PortoSeguroStorage = (() => {
 
   async function buscarPlanoSeguranca() {
     if (modo !== 'indexeddb') return null;
-    const tx = banco.transaction(STORE_PLANOS, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_PLANOS, 'readonly');
     const bruto = await requisicao(tx.objectStore(STORE_PLANOS).get('plano-pessoal'));
     return desempacotarGenerico(bruto, chaveAtual);
   }
@@ -368,66 +381,66 @@ window.PortoSeguroStorage = (() => {
   async function salvarPlanoSeguranca(plano) {
     if (modo !== 'indexeddb') throw new Error('O plano pessoal requer IndexedDB neste navegador.');
     const paraGravar = await empacotarGenerico({ ...plano, id: 'plano-pessoal' }, ['id'], chaveAtual);
-    const tx = banco.transaction(STORE_PLANOS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_PLANOS, 'readwrite');
     tx.objectStore(STORE_PLANOS).put(paraGravar);
     await concluirTransacao(tx);
   }
 
   async function excluirPlanoSeguranca() {
     if (modo !== 'indexeddb') return;
-    const tx = banco.transaction(STORE_PLANOS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_PLANOS, 'readwrite');
     tx.objectStore(STORE_PLANOS).delete('plano-pessoal');
     await concluirTransacao(tx);
   }
 
   async function buscarCaixaAcolhimento() {
     if (modo !== 'indexeddb') return null;
-    const tx = banco.transaction(STORE_ACOLHIMENTO, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_ACOLHIMENTO, 'readonly');
     const bruto = await requisicao(tx.objectStore(STORE_ACOLHIMENTO).get('minha-caixa'));
     return desempacotarCaixaGenerico(bruto, chaveAtual);
   }
   async function salvarCaixaAcolhimento(caixa) {
     if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
     const paraGravar = await empacotarCaixaGenerico({ ...caixa, id: 'minha-caixa' }, chaveAtual);
-    const tx = banco.transaction(STORE_ACOLHIMENTO, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_ACOLHIMENTO, 'readwrite');
     tx.objectStore(STORE_ACOLHIMENTO).put(paraGravar);
     await concluirTransacao(tx);
   }
-  async function excluirCaixaAcolhimento() { if (modo !== 'indexeddb') return; const tx = banco.transaction(STORE_ACOLHIMENTO, 'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).delete('minha-caixa'); await concluirTransacao(tx); }
+  async function excluirCaixaAcolhimento() { if (modo !== 'indexeddb') return; const tx = (await obterBanco()).transaction(STORE_ACOLHIMENTO, 'readwrite'); tx.objectStore(STORE_ACOLHIMENTO).delete('minha-caixa'); await concluirTransacao(tx); }
 
   async function buscarAudioDiario(recordId) {
     if (modo !== 'indexeddb') return null;
-    const tx = banco.transaction(STORE_AUDIOS, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_AUDIOS, 'readonly');
     const bruto = await requisicao(tx.objectStore(STORE_AUDIOS).get(recordId));
     return desempacotarAudioGenerico(bruto, chaveAtual);
   }
   async function salvarAudioDiario(recordId, blob) {
     if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
     const paraGravar = await empacotarAudioGenerico({ recordId, blob, createdAt: new Date().toISOString() }, chaveAtual);
-    const tx = banco.transaction(STORE_AUDIOS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_AUDIOS, 'readwrite');
     tx.objectStore(STORE_AUDIOS).put(paraGravar);
     await concluirTransacao(tx);
   }
-  async function excluirAudioDiario(recordId) { if (modo !== 'indexeddb') return; const tx = banco.transaction(STORE_AUDIOS, 'readwrite'); tx.objectStore(STORE_AUDIOS).delete(recordId); await concluirTransacao(tx); }
+  async function excluirAudioDiario(recordId) { if (modo !== 'indexeddb') return; const tx = (await obterBanco()).transaction(STORE_AUDIOS, 'readwrite'); tx.objectStore(STORE_AUDIOS).delete(recordId); await concluirTransacao(tx); }
 
   async function buscarPerfilAcolhimento() {
     if (modo !== 'indexeddb') return null;
-    const tx = banco.transaction(STORE_PERFIL, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_PERFIL, 'readonly');
     const bruto = await requisicao(tx.objectStore(STORE_PERFIL).get('meu-perfil'));
     return desempacotarGenerico(bruto, chaveAtual);
   }
   async function salvarPerfilAcolhimento(perfil) {
     if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
     const paraGravar = await empacotarGenerico({ ...perfil, id: 'meu-perfil' }, ['id'], chaveAtual);
-    const tx = banco.transaction(STORE_PERFIL, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_PERFIL, 'readwrite');
     tx.objectStore(STORE_PERFIL).put(paraGravar);
     await concluirTransacao(tx);
   }
-  async function excluirPerfilAcolhimento() { if (modo !== 'indexeddb') return; const tx = banco.transaction(STORE_PERFIL, 'readwrite'); tx.objectStore(STORE_PERFIL).delete('meu-perfil'); await concluirTransacao(tx); }
+  async function excluirPerfilAcolhimento() { if (modo !== 'indexeddb') return; const tx = (await obterBanco()).transaction(STORE_PERFIL, 'readwrite'); tx.objectStore(STORE_PERFIL).delete('meu-perfil'); await concluirTransacao(tx); }
 
   async function buscarFeedbackApoio() {
     if (modo !== 'indexeddb') return [];
-    const tx = banco.transaction(STORE_FEEDBACK, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_FEEDBACK, 'readonly');
     const lista = await requisicao(tx.objectStore(STORE_FEEDBACK).getAll());
     const claros = [];
     for (const bruto of lista) {
@@ -439,7 +452,7 @@ window.PortoSeguroStorage = (() => {
   async function salvarFeedbackApoio(item) {
     if (modo !== 'indexeddb') return;
     const paraGravar = await empacotarGenerico(item, ['id'], chaveAtual);
-    const tx = banco.transaction(STORE_FEEDBACK, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_FEEDBACK, 'readwrite');
     tx.objectStore(STORE_FEEDBACK).put(paraGravar);
     await concluirTransacao(tx);
   }
@@ -447,14 +460,14 @@ window.PortoSeguroStorage = (() => {
   async function salvarRelatorio(item) {
     if (modo !== 'indexeddb') throw new Error('IndexedDB indisponível.');
     const paraGravar = await empacotarGenerico(item, ['id'], chaveAtual);
-    const tx = banco.transaction(STORE_RELATORIOS, 'readwrite');
+    const tx = (await obterBanco()).transaction(STORE_RELATORIOS, 'readwrite');
     tx.objectStore(STORE_RELATORIOS).put(paraGravar);
     await concluirTransacao(tx);
   }
 
   async function buscarRelatorios() {
     if (modo !== 'indexeddb') return [];
-    const tx = banco.transaction(STORE_RELATORIOS, 'readonly');
+    const tx = (await obterBanco()).transaction(STORE_RELATORIOS, 'readonly');
     const lista = await requisicao(tx.objectStore(STORE_RELATORIOS).getAll());
     const claros = [];
     for (const bruto of lista) {

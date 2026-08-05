@@ -24,16 +24,17 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 window.PortoSeguroSync = (() => {
-  // Preencha com a configuração do app Web do seu projeto Firebase
-  // (Console do Firebase → Configurações do projeto → Seus apps → Web).
-  // Os valores abaixo são placeholders e só funcionam contra o emulador local.
+  // Configuração real do app Web "Porto Seguro Web", registrado no projeto
+  // Firebase porto-seguro-ananunes (Console do Firebase → Configurações do
+  // projeto → Seus apps → Web). A apiKey aqui não é um segredo: ela só
+  // identifica o projeto, quem autoriza o acesso são as regras do Firestore.
   const CONFIGURACAO_FIREBASE = {
-    apiKey: 'SUBSTITUA_PELA_SUA_API_KEY',
+    apiKey: 'AIzaSyBdxwIf9JnwtuKK0lRNTtsKVHVUMkyfmOw',
     authDomain: 'porto-seguro-ananunes.firebaseapp.com',
     projectId: 'porto-seguro-ananunes',
-    storageBucket: 'porto-seguro-ananunes.appspot.com',
-    messagingSenderId: 'SUBSTITUA_PELO_SEU_SENDER_ID',
-    appId: 'SUBSTITUA_PELO_SEU_APP_ID'
+    storageBucket: 'porto-seguro-ananunes.firebasestorage.app',
+    messagingSenderId: '1066253106604',
+    appId: '1:1066253106604:web:1acac60dde788bee660e09'
   };
 
   const ITERACOES_SINCRONIZACAO = 600000;
