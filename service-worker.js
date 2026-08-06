@@ -1,4 +1,4 @@
-const CACHE_NAME = 'porto-seguro-v17';
+const CACHE_NAME = 'porto-seguro-v18';
 const ARQUIVOS = [
     './',
     './index.html',
@@ -6,6 +6,7 @@ const ARQUIVOS = [
     './storage.js',
     './script.js',
     './sync.js',
+    './resumo-ia.js',
     './manifest.webmanifest',
     './favicon.svg',
     './privacidade.html'

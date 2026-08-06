@@ -311,11 +311,16 @@ window.PortoSeguroSync = (() => {
     };
   }
 
+  // Reaproveitado pelo módulo opcional de resumo por IA (resumo-ia.js), que
+  // precisa do mesmo app Firebase já inicializado (mesma conta de login) para
+  // chamar a Cloud Function via getFunctions(app).
+  function obterAppFirebase() { return app; }
+
   return {
     inicializar,
     criarContaComEmailSenha, entrarComEmailSenha, entrarComGoogle, sair, usuarioAtual, aoMudarSessao,
     existeChaveSincronizacaoConfigurada, configurarChaveSincronizacaoPelaPrimeiraVez, desbloquearChaveSincronizacao,
     definirChaveSincronizacao, limparChaveSincronizacao, temChaveSincronizacao,
-    sincronizarAgora, status
+    sincronizarAgora, status, obterAppFirebase
   };
 })();

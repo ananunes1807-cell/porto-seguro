@@ -13,7 +13,7 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - caixa de acolhimento com textos, foto e áudio locais, com limites de tamanho e exclusão confirmada;
 - gravação de áudio no diário após permissão explícita, com reprodução e descarte antes de salvar no IndexedDB;
 - Perfil de Acolhimento opcional, editável e salvo automaticamente, com frases locais ajustadas pelas preferências e avaliações;
-- relatórios locais direcionados a psicologia, psiquiatria, medicina, terapia ocupacional, assistência social ou outro profissional, com prévia editável e salvamento opcional;
+- relatórios resumidos por temas (11 seções fixas, sem reproduzir o diário completo) direcionados a psicologia, psiquiatria, medicina, terapia ocupacional, assistência social ou outro profissional, com prévia editável, controles de privacidade, anexo opcional dos registros completos e aprimoramento opcional por IA (Claude ou ChatGPT) — veja "Aprimoramento de relatórios por IA (opcional)" abaixo;
 - respiração em cinco ciclos (4 segundos inspirando e 6 soltando), com pausa, continuação, foco preso no diálogo e redução de movimento;
 - diário com título automático, sentimentos, intensidade, texto livre, campos “o que ajudou” e “o que piorou”;
 - criação e edição com data/hora, identificador preservado e histórico de versões;
@@ -62,6 +62,22 @@ Para rodar esse recurso localmente (contribuindo com o projeto):
 
 Veja `privacidade.html`, seção "Limites da sincronização", para os avisos completos sobre esse recurso — incluindo que a chave de sincronização não pode ser recuperada.
 
+## Aprimoramento de relatórios por IA (opcional)
+
+Além do resumo local por temas (sempre disponível, sem custo, sem IA), é possível pedir que um provedor de IA (Claude, da Anthropic, ou ChatGPT, da OpenAI) reescreva as seções de texto livre do relatório em prosa mais natural. Esse recurso é opcional, desligado por padrão, exige estar conectado à conta de sincronização e mostra exatamente o que seria enviado antes de cada envio. A seção de situações de risco nunca é decidida pela IA — ela só pode reescrever o texto já determinado localmente por palavras-chave, e qualquer tentativa de mudar os achados é descartada automaticamente (tanto no servidor quanto neste aparelho).
+
+Para rodar esse recurso localmente (contribuindo com o projeto):
+
+1. Faça upgrade do projeto Firebase para o plano **Blaze** (pago por uso) — obrigatório para Cloud Functions. As Functions em si e o uso comum ficam dentro da faixa gratuita do Blaze; o custo real vem dos tokens consumidos nos provedores de IA.
+2. Crie uma chave de API na [Anthropic](https://console.anthropic.com/) e/ou na [OpenAI](https://platform.openai.com/), conforme os provedores que quiser habilitar.
+3. Configure os segredos no projeto: `firebase functions:secrets:set ANTHROPIC_API_KEY` e/ou `firebase functions:secrets:set OPENAI_API_KEY`.
+4. Publique a function: `firebase deploy --only functions`.
+5. Para testar sem gastar chamadas reais de IA, use o emulador de Functions junto com os de Auth/Firestore: `firebase emulators:start --only auth,firestore,functions`. Com o app aberto em `localhost`, `resumo-ia.js` se conecta neles automaticamente; sem uma chave de API real configurada no emulador, a chamada falha com uma mensagem clara e o relatório local continua funcionando normalmente.
+
+Veja `privacidade.html`, seção "Limites do aprimoramento por IA", para os avisos completos sobre esse recurso.
+
+Por padrão, a function exige login e aplica um limite diário por conta, mas não exige App Check — ativar App Check no console sem preparar o cliente para enviar o token correspondente derruba a function inteira (foi o que aconteceu com a Authentication anteriormente neste projeto). Para adicionar essa camada extra depois: configure App Check (reCAPTCHA v3) no Console do Firebase, adicione o SDK `firebase-app-check` em `resumo-ia.js` e `sync.js`, e só então mude `enforceAppCheck` para `true` em `functions/index.js`.
+
 ## Publicar no GitHub Pages
 
 1. Revise e envie os arquivos para a branch `main` de um repositório público.
@@ -77,5 +93,5 @@ Veja `privacidade.html`, seção "Limites da sincronização", para os avisos co
 - o ícone atual é SVG; alguns dispositivos antigos podem exigir ícones PNG de 192 e 512 px;
 - fotos e áudios ficam apenas no navegador e não são incluídos no backup JSON nem na sincronização;
 - sincronizar fotos/áudios exigiria Firebase Storage e o plano pago (Blaze) do projeto — não incluído nesta etapa;
-- IA online exigiria consentimento, política de privacidade e backend seguro; nenhuma chave de API existe neste projeto.
-- a organização atual dos relatórios é inteiramente local; a arquitetura futura de IA não está exposta na interface e nenhum dado é transmitido.
+- o aprimoramento por IA nos relatórios exige plano Blaze, chaves de API próprias e login — sem essa configuração manual, o app continua funcionando normalmente só com o resumo local por temas;
+- as listas de palavras-chave usadas no resumo local e na detecção de situações de risco são um ponto de partida razoável, mas ainda não passaram por revisão clínica formal; elas podem gerar falsos positivos e falsos negativos.

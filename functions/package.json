@@ -1,0 +1,13 @@
+{
+  "name": "porto-seguro-functions",
+  "description": "Cloud Functions do Porto Seguro — aprimoramento opcional de relatórios por IA",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.1.1"
+  }
+}
