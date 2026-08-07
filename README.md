@@ -13,7 +13,7 @@ Aplicativo web de apoio emocional, respiração guiada e diário local. A frase 
 - caixa de acolhimento com textos, foto e áudio locais, com limites de tamanho e exclusão confirmada;
 - gravação de áudio no diário após permissão explícita, com reprodução e descarte antes de salvar no IndexedDB;
 - Perfil de Acolhimento opcional, editável e salvo automaticamente, com frases locais ajustadas pelas preferências e avaliações;
-- relatórios resumidos por temas (11 seções fixas, sem reproduzir o diário completo) direcionados a psicologia, psiquiatria, medicina, terapia ocupacional, assistência social ou outro profissional, com prévia editável, controles de privacidade, anexo opcional dos registros completos e aprimoramento opcional por IA (Claude ou ChatGPT) — veja "Aprimoramento de relatórios por IA (opcional)" abaixo;
+- relatórios resumidos por temas (11 seções fixas, sem reproduzir o diário completo) direcionados a psicologia, psiquiatria, medicina, terapia ocupacional, assistência social ou outro profissional, com prévia editável, controles de privacidade, anexo opcional dos registros completos e um prompt pronto (gratuito, sem conta, sem backend) para aprimorar o texto em qualquer IA que a pessoa já use — veja "Prompt para IA (opcional)" abaixo;
 - respiração em cinco ciclos (4 segundos inspirando e 6 soltando), com pausa, continuação, foco preso no diálogo e redução de movimento;
 - diário com título automático, sentimentos, intensidade, texto livre, campos “o que ajudou” e “o que piorou”;
 - criação e edição com data/hora, identificador preservado e histórico de versões;
@@ -62,21 +62,13 @@ Para rodar esse recurso localmente (contribuindo com o projeto):
 
 Veja `privacidade.html`, seção "Limites da sincronização", para os avisos completos sobre esse recurso — incluindo que a chave de sincronização não pode ser recuperada.
 
-## Aprimoramento de relatórios por IA (opcional)
+## Prompt para IA (opcional)
 
-Além do resumo local por temas (sempre disponível, sem custo, sem IA), é possível pedir que um provedor de IA (Claude, da Anthropic, ou ChatGPT, da OpenAI) reescreva as seções de texto livre do relatório em prosa mais natural. Esse recurso é opcional, desligado por padrão, exige estar conectado à conta de sincronização e mostra exatamente o que seria enviado antes de cada envio. A seção de situações de risco nunca é decidida pela IA — ela só pode reescrever o texto já determinado localmente por palavras-chave, e qualquer tentativa de mudar os achados é descartada automaticamente (tanto no servidor quanto neste aparelho).
+Além do resumo local por temas (sempre disponível, sem custo, sem IA, sem conta), o relatório oferece um botão **"Gerar prompt para IA"** que monta um texto pronto — já com as instruções de tom neutro, o banco de frases aprovado e os dados já resumidos localmente (sem o nome da pessoa, sem a seção de identificação) — para você copiar e colar em qualquer IA de sua confiança que já use gratuitamente: Claude (claude.ai), ChatGPT (chatgpt.com), Gemini (gemini.google.com) ou outra. Depois é só colar a resposta de volta no campo indicado e tocar em "Aplicar resposta ao relatório".
 
-Para rodar esse recurso localmente (contribuindo com o projeto):
+Esse fluxo é inteiramente local: nenhum dado sai do navegador automaticamente, não exige conta, plano pago, chave de API ou backend próprio — só o que você mesma(o) decide copiar e colar em outro serviço. A seção de situações de risco nunca é decidida pela IA: ela só pode reescrever o texto já determinado localmente por palavras-chave, e se a resposta colada mudar os achados (adicionar ou remover menção a plano, intenção, meios etc.), o app descarta a reescrita dessa seção e mantém o texto local automaticamente.
 
-1. Faça upgrade do projeto Firebase para o plano **Blaze** (pago por uso) — obrigatório para Cloud Functions. As Functions em si e o uso comum ficam dentro da faixa gratuita do Blaze; o custo real vem dos tokens consumidos nos provedores de IA.
-2. Crie uma chave de API na [Anthropic](https://console.anthropic.com/) e/ou na [OpenAI](https://platform.openai.com/), conforme os provedores que quiser habilitar.
-3. Configure os segredos no projeto: `firebase functions:secrets:set ANTHROPIC_API_KEY` e/ou `firebase functions:secrets:set OPENAI_API_KEY`.
-4. Publique a function: `firebase deploy --only functions`.
-5. Para testar sem gastar chamadas reais de IA, use o emulador de Functions junto com os de Auth/Firestore: `firebase emulators:start --only auth,firestore,functions`. Com o app aberto em `localhost`, `resumo-ia.js` se conecta neles automaticamente; sem uma chave de API real configurada no emulador, a chamada falha com uma mensagem clara e o relatório local continua funcionando normalmente.
-
-Veja `privacidade.html`, seção "Limites do aprimoramento por IA", para os avisos completos sobre esse recurso.
-
-Por padrão, a function exige login e aplica um limite diário por conta, mas não exige App Check — ativar App Check no console sem preparar o cliente para enviar o token correspondente derruba a function inteira (foi o que aconteceu com a Authentication anteriormente neste projeto). Para adicionar essa camada extra depois: configure App Check (reCAPTCHA v3) no Console do Firebase, adicione o SDK `firebase-app-check` em `resumo-ia.js` e `sync.js`, e só então mude `enforceAppCheck` para `true` em `functions/index.js`.
+Veja `privacidade.html`, seção "Limites do prompt para IA", para os avisos completos sobre esse recurso.
 
 ## Publicar no GitHub Pages
 
@@ -93,5 +85,5 @@ Por padrão, a function exige login e aplica um limite diário por conta, mas n�
 - o ícone atual é SVG; alguns dispositivos antigos podem exigir ícones PNG de 192 e 512 px;
 - fotos e áudios ficam apenas no navegador e não são incluídos no backup JSON nem na sincronização;
 - sincronizar fotos/áudios exigiria Firebase Storage e o plano pago (Blaze) do projeto — não incluído nesta etapa;
-- o aprimoramento por IA nos relatórios exige plano Blaze, chaves de API próprias e login — sem essa configuração manual, o app continua funcionando normalmente só com o resumo local por temas;
+- o prompt para IA depende de colar manualmente a resposta em um serviço de terceiros (fora do controle do Porto Seguro); a qualidade e a privacidade dessa etapa seguem as políticas do serviço de IA escolhido pela própria pessoa;
 - as listas de palavras-chave usadas no resumo local e na detecção de situações de risco são um ponto de partida razoável, mas ainda não passaram por revisão clínica formal; elas podem gerar falsos positivos e falsos negativos.
