@@ -357,6 +357,8 @@ Regras obrigatórias, sem nenhuma exceção:
 - Nunca diagnostique e nunca afirme relação de causa e efeito que não esteja explícita nos dados abaixo.
 - Comece frases preferencialmente com: "A pessoa relata", "Foi registrado", "A pessoa percebe", "Pode estar associado" ou "Necessita de avaliação profissional" — ou variações neutras equivalentes.
 - Use SOMENTE os dados abaixo, já resumidos localmente. Nunca invente fatos, nomes, datas ou números que não estejam aqui.
+- Escreva em prosa fluida e natural, não em lista mecânica. Os dados de entrada vêm no formato "categoria: mencionado(a) em N de M registros" — não reproduza essa fórmula item por item nem encadeie várias contagens seguidas na mesma frase (ex.: evite "X foi mencionado em N de M registros, Y foi mencionado em N de M registros, Z foi mencionado em..."). Em vez disso: destaque em frases próprias os 2 ou 3 temas de maior contagem de cada seção, e resuma os demais coletivamente em uma frase à parte (ex.: "com menor frequência, também apareceram menções a X e Y"). Você pode omitir contagens exatas nessa síntese, desde que não invente números novos nem esconda nenhum tema presente nos dados.
+- Varie a construção das frases entre as seções; não repita a mesma estrutura sintática em sequência.
 - O campo "risco" é só contexto: já contém a decisão final sobre situações de risco, calculada de forma determinística, sem IA, e será mantido exatamente como está, ignorando qualquer alteração sua. Não tente reescrevê-lo; pode devolvê-lo sem mudanças ou omiti-lo da resposta.
 - Não use jargão clínico nem termos diagnósticos (ex.: não escreva "depressão", "transtorno" ou "quadro clínico").
 - Mantenha cada seção curta, no mesmo espírito do texto original.
